@@ -31,6 +31,13 @@ router.post('/export', async (req, res) => {
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Execution Tracker');
 
+    // Create a hidden sheet for the dropdown values (More robust than literal strings)
+    const listSheet = workbook.addWorksheet('_SystemLists', { state: 'hidden' });
+    const statuses = ['PENDING', 'PASS', 'FAIL', 'BLOCKED'];
+    statuses.forEach((s, idx) => {
+      listSheet.getCell(`A${idx + 1}`).value = s;
+    });
+
     // Configure Columns
     sheet.columns = [
       { header: '#', key: 'idx', width: 5 },
@@ -57,9 +64,6 @@ router.post('/export', async (req, res) => {
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
     headerRow.height = 30;
 
-    // Status Dropdown Options
-    const statusOptions = ['"PENDING,PASS,FAIL,BLOCKED"'];
-
     // Add Data & Validations
     scenarios.forEach((s, i) => {
       const row = sheet.addRow({
@@ -83,12 +87,12 @@ router.post('/export', async (req, res) => {
       // Style row
       row.alignment = { vertical: 'middle', wrapText: true };
       
-      // Add Dropdowns to Status columns
+      // Add Dropdowns to Status columns (Using Referenced Formula)
       ['H', 'J', 'L', 'N', 'O'].forEach(col => {
         sheet.getCell(`${col}${i + 2}`).dataValidation = {
           type: 'list',
           allowBlank: true,
-          formulae: statusOptions,
+          formulae: ['_SystemLists!$A$1:$A$4'],
           showErrorMessage: true,
           errorTitle: 'Invalid Status',
           error: 'Please select a valid status from the list.'
