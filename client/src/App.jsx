@@ -767,7 +767,10 @@ const App = () => {
     
     const updated = generatedScenarios.map((s, i) => {
       if (i === editingScenarioIndex) return editingScenarioData;
-      return { ...s, ...sharedData };
+      return { 
+        ...s, 
+        ...sharedData 
+      };
     });
     
     setGeneratedScenarios(updated);
@@ -1931,6 +1934,56 @@ const App = () => {
                   onChange={(e) => setEditingScenarioData({...editingScenarioData, expectedResult: e.target.value})}
                   required
                 />
+              </div>
+
+              {/* Validation Points Editing */}
+              <div className={`p-6 rounded-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'} border space-y-4`}>
+                <h4 className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor} flex items-center gap-2`}>
+                  <CheckCircle2 size={12} className="text-primary" />
+                  Validation Architecture
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Order Build / Pricing</label>
+                    <input 
+                      type="text" 
+                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
+                      value={editingScenarioData.orderBuild || ''}
+                      onChange={(e) => setEditingScenarioData({...editingScenarioData, orderBuild: e.target.value})}
+                      placeholder="e.g. Validate Price: £59.99"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Status Sync / Completion</label>
+                    <input 
+                      type="text" 
+                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
+                      value={editingScenarioData.orderCompletion || ''}
+                      onChange={(e) => setEditingScenarioData({...editingScenarioData, orderCompletion: e.target.value})}
+                      placeholder="e.g. Order Status: CLOSED"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>T&C / Comms Assurance</label>
+                    <input 
+                      type="text" 
+                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
+                      value={editingScenarioData.tcAssurance || ''}
+                      onChange={(e) => setEditingScenarioData({...editingScenarioData, tcAssurance: e.target.value})}
+                      placeholder="e.g. Verify Welcome SMS"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Billing Expectations</label>
+                    <input 
+                      type="text" 
+                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
+                      value={editingScenarioData.billing || ''}
+                      onChange={(e) => setEditingScenarioData({...editingScenarioData, billing: e.target.value})}
+                      placeholder="e.g. Part-month rental"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
                 <button 
