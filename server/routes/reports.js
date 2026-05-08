@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const pptxgen = require('pptxgenjs');
-
-const prisma = new PrismaClient();
 
 // GET /api/reports/project/:id/ppt
 router.get('/project/:id/ppt', async (req, res) => {

@@ -1,9 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const multer = require('multer');
 
-const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // Get all projects
@@ -15,20 +14,47 @@ router.get('/', async (req, res) => {
     });
     res.json(projects);
   } catch (error) {
+    console.error('Fetch Projects Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Create new project
 router.post('/', async (req, res) => {
-  const { name, themeColor } = req.body;
+  const { name, themeColor, startDate, goLiveDate } = req.body;
+  
+  console.log(`[Production] Attempting to create project: "${name}"`);
+  
+  if (!name || !name.trim()) {
+    return res.status(400).json({ error: 'Project name is required' });
+  }
+
   try {
+    // Robust date parsing
+    const parseDate = (d) => {
+      if (!d) return null;
+      const date = new Date(d);
+      return isNaN(date.getTime()) ? null : date;
+    };
+
     const project = await prisma.project.create({
-      data: { name, themeColor }
+      data: { 
+        name: name.trim(), 
+        themeColor: themeColor || '#f8fafc',
+        startDate: parseDate(startDate),
+        goLiveDate: parseDate(goLiveDate)
+      }
     });
+    console.log(`[Production] Project created successfully: ${project.id}`);
     res.json(project);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('[Production] Create Project Error:', error);
+    // Return a clean error message to the frontend
+    let msg = error.message;
+    if (error.code === 'P2002') msg = 'A project with this name already exists.';
+    if (error.message.includes('PrismaClientInitializationError')) msg = 'Database connection failed. Please check environment variables.';
+    
+    res.status(500).json({ error: msg });
   }
 });
 

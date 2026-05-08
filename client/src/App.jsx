@@ -258,7 +258,8 @@ const App = () => {
       setSelectedProjectId(res.data.id);
     } catch (err) {
       console.error('Create project failed', err);
-      alert('Failed to create project');
+      const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to create project: ${errorMsg}`);
     } finally {
       setLoading(false);
     }

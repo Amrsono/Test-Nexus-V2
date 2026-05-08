@@ -2,10 +2,9 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const xlsx = require('xlsx');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { parseTestCases } = require('../services/aiParser');
 
-const prisma = new PrismaClient();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const { emitStatus } = require('../socket');

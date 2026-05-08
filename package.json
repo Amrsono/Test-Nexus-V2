@@ -12,6 +12,7 @@
     "postinstall": "cd server && npx prisma generate"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "prisma": "^5.22.0"
   }
 }

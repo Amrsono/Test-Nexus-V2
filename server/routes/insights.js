@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const { generateInsights } = require('../services/aiAdvisor');
-
-const prisma = new PrismaClient();
 
 // Get recent insights for a project
 router.get('/', async (req, res) => {

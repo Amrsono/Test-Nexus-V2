@@ -3,15 +3,16 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const http = require('http');
 const socketManager = require('./socket');
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('./lib/prisma');
 
-dotenv.config({ path: '../.env' }); // Load from root .env
+const path = require('path');
+dotenv.config(); // Default fallback
+dotenv.config({ path: path.join(__dirname, '../.env') }); // Explicit path for local dev
 
 const app = express();
 const server = http.createServer(app);
 const io = socketManager.init(server);
 
-const prisma = new PrismaClient();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
