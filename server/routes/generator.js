@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { generateScenarios } = require('../services/aiGenerator');
 const { emitStatus } = require('../socket');
-const XLSX = require('xlsx');
+const ExcelJS = require('exceljs');
 
 // POST /api/generator/generate
 router.post('/generate', async (req, res) => {
@@ -20,7 +20,7 @@ router.post('/generate', async (req, res) => {
   }
 });
 
-// POST /api/generator/export
+// POST /api/generator/export - Now with Interactive Dropdowns
 router.post('/export', async (req, res) => {
   const { scenarios, projectName } = req.body;
   if (!scenarios || !Array.isArray(scenarios)) {
@@ -28,31 +28,83 @@ router.post('/export', async (req, res) => {
   }
 
   try {
-    // Create worksheet with "Import-Ready" headers
-    const worksheetData = scenarios.map((s, idx) => ({
-      '#': String(idx + 1),
-      'Summary': String(s.summary || ''),
-      'Steps': String(s.steps || ''),
-      'Expected Result': String(s.expectedResult || ''),
-      'Order Build': String(s.orderBuild || 'N/A'),
-      'Order Completion': String(s.orderCompletion || 'N/A'),
-      'T&C Assurance': String(s.tcAssurance || 'N/A'),
-      'Billing': String(s.billing || 'N/A'),
-      'Priority': String(s.priority || 'MEDIUM'),
-      'Module': String(s.module || 'AI Draft')
-    }));
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Execution Tracker');
 
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Test Plan');
+    // Configure Columns
+    sheet.columns = [
+      { header: '#', key: 'idx', width: 5 },
+      { header: 'Journey Summary', key: 'summary', width: 45 },
+      { header: 'Execution Priority', key: 'priority', width: 15 },
+      { header: 'Module', key: 'module', width: 20 },
+      { header: 'Test Steps', key: 'steps', width: 60 },
+      { header: 'Expected Outcome', key: 'expectedResult', width: 50 },
+      { header: 'Validation: Order Build', key: 'orderBuild', width: 30 },
+      { header: 'Build Status', key: 'obStatus', width: 15 },
+      { header: 'Validation: Status Sync', key: 'orderCompletion', width: 30 },
+      { header: 'Sync Status', key: 'ocStatus', width: 15 },
+      { header: 'Validation: T&C / Comms', key: 'tcAssurance', width: 30 },
+      { header: 'Comms Status', key: 'tcStatus', width: 15 },
+      { header: 'Validation: Billing', key: 'billing', width: 30 },
+      { header: 'Billing Status', key: 'bStatus', width: 15 },
+      { header: 'OVERALL JOURNEY STATUS', key: 'overall', width: 25 }
+    ];
 
-    // Generate buffer
-    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    // Style Header Row
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 30;
 
+    // Status Dropdown Options
+    const statusOptions = ['"PENDING,PASS,FAIL,BLOCKED"'];
+
+    // Add Data & Validations
+    scenarios.forEach((s, i) => {
+      const row = sheet.addRow({
+        idx: i + 1,
+        summary: s.summary || '',
+        priority: s.priority || 'MEDIUM',
+        module: s.module || 'Draft',
+        steps: s.steps || '',
+        expectedResult: s.expectedResult || '',
+        orderBuild: s.orderBuild || 'N/A',
+        obStatus: 'PENDING',
+        orderCompletion: s.orderCompletion || 'N/A',
+        ocStatus: 'PENDING',
+        tcAssurance: s.tcAssurance || 'N/A',
+        tcStatus: 'PENDING',
+        billing: s.billing || 'N/A',
+        bStatus: 'PENDING',
+        overall: 'PENDING'
+      });
+
+      // Style row
+      row.alignment = { vertical: 'middle', wrapText: true };
+      
+      // Add Dropdowns to Status columns
+      ['H', 'J', 'L', 'N', 'O'].forEach(col => {
+        sheet.getCell(`${col}${i + 2}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: statusOptions,
+          showErrorMessage: true,
+          errorTitle: 'Invalid Status',
+          error: 'Please select a valid status from the list.'
+        };
+      });
+    });
+
+    // Final Styling (Borders & Auto-filter)
+    sheet.autoFilter = 'A1:O1';
+    
     const safeName = (projectName || 'Test_Plan').replace(/[^a-z0-9]/gi, '_');
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_Draft.xlsx"`);
-    res.send(buffer);
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}_Execution_Tracker.xlsx"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
   } catch (error) {
     console.error('Export Route Error:', error);
     res.status(500).json({ error: error.message });
