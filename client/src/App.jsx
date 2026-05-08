@@ -523,6 +523,32 @@ const App = () => {
     }
   };
 
+  const handleResetBackground = async () => {
+    if (!selectedProjectId) return;
+    try {
+      setLoading(true);
+      await axios.patch(`${API_BASE}/projects/${selectedProjectId}`, { backgroundUrl: null });
+      await fetchProjects();
+    } catch (err) {
+      console.error('Reset failed', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetLogo = async () => {
+    if (!selectedProjectId) return;
+    try {
+      setLoading(true);
+      await axios.patch(`${API_BASE}/projects/${selectedProjectId}`, { logoUrl: null });
+      await fetchProjects();
+    } catch (err) {
+      console.error('Reset failed', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAnalyze = async () => {
     try {
       await axios.post(`${API_BASE}/insights/analyze`, { projectId: selectedProjectId });
@@ -873,16 +899,38 @@ const App = () => {
               <AlertCircle size={18} />
               Reset {selectedProject?.name ? `(${selectedProject.name})` : ''}
             </button>
-            <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
-              <Plus size={18} />
-              Background
-              <input type="file" className="hidden" onChange={handleBackgroundUpload} accept="image/*" />
-            </label>
-            <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
-              <Plus size={18} />
-              Logo
-              <input type="file" className="hidden" onChange={handleLogoUpload} accept="image/*" />
-            </label>
+            <div className="flex gap-2">
+              <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
+                <Plus size={18} />
+                Background
+                <input type="file" className="hidden" onChange={handleBackgroundUpload} accept="image/*" />
+              </label>
+              {selectedProject?.backgroundUrl && (
+                <button 
+                  onClick={handleResetBackground}
+                  className={`flex items-center justify-center w-10 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 transition-all`}
+                  title="Reset Background"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
+                <Plus size={18} />
+                Logo
+                <input type="file" className="hidden" onChange={handleLogoUpload} accept="image/*" />
+              </label>
+              {selectedProject?.logoUrl && (
+                <button 
+                  onClick={handleResetLogo}
+                  className={`flex items-center justify-center w-10 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl hover:bg-rose-500/20 transition-all`}
+                  title="Reset Logo"
+                >
+                  <Trash2 size={16} />
+                </button>
+              )}
+            </div>
             <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 cursor-pointer">
               <Upload size={18} />
               Import

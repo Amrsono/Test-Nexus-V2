@@ -66,6 +66,8 @@ router.patch('/:id', async (req, res) => {
   let updateData = {};
   if (name !== undefined) updateData.name = name;
   if (themeColor !== undefined) updateData.themeColor = themeColor;
+  if (backgroundUrl !== undefined) updateData.backgroundUrl = backgroundUrl;
+  if (logoUrl !== undefined) updateData.logoUrl = logoUrl;
   
   if (startDate !== undefined) {
     updateData.startDate = startDate ? new Date(startDate) : null;
