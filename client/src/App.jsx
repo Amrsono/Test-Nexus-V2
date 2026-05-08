@@ -756,6 +756,28 @@ const App = () => {
     setEditingScenarioData(null);
   };
 
+  const handleSaveAndSyncAll = (e) => {
+    e.preventDefault();
+    if (editingScenarioIndex === null || !editingScenarioData) return;
+    
+    const count = generatedScenarios.length;
+    if (!window.confirm(`Master Sync: This will apply these steps, outcomes, and settings to ALL ${count} journeys in your current draft. Unique titles will be preserved. Proceed?`)) return;
+
+    const { summary, ...sharedData } = editingScenarioData;
+    
+    const updated = generatedScenarios.map((s, i) => {
+      if (i === editingScenarioIndex) return editingScenarioData;
+      return { ...s, ...sharedData };
+    });
+    
+    setGeneratedScenarios(updated);
+    setIsEditScenarioModalOpen(false);
+    setEditingScenarioIndex(null);
+    setEditingScenarioData(null);
+    
+    setAgentLogs(prev => [...prev, `AI Agent: Bulk Synchronisation applied to ${count} journeys.`]);
+  };
+
   // Scroll to results when scenarios are generated
   useEffect(() => {
     if (generatedScenarios.length > 0 && !isGenerating) {
@@ -1910,17 +1932,30 @@ const App = () => {
                   required
                 />
               </div>
-              <div className="pt-4 flex gap-4">
+              <div className="pt-4 flex flex-col sm:flex-row gap-4">
                 <button 
                   type="button" 
                   onClick={() => setIsEditScenarioModalOpen(false)}
-                  className={`flex-1 py-3 border rounded-xl font-bold ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'} hover:bg-slate-50 transition-all`}
+                  className={`flex-1 py-3 border rounded-xl font-bold ${isDark ? 'border-white/10 text-slate-400 hover:bg-white/5' : 'border-slate-200 text-slate-600 hover:bg-slate-50'} transition-all`}
                 >
                   Discard Changes
                 </button>
-                <button type="submit" className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20">
-                  Update Journey
-                </button>
+                <div className="flex-[2] flex gap-3">
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-3 bg-slate-800 text-white font-bold rounded-xl hover:bg-slate-700 transition-all border border-white/10"
+                  >
+                    Update One
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSaveAndSyncAll}
+                    className="flex-[1.5] py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary/80 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                  >
+                    <Sparkles size={16} />
+                    Sync to All ({generatedScenarios.length})
+                  </button>
+                </div>
               </div>
             </form>
           </div>
