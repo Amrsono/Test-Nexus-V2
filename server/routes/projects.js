@@ -61,7 +61,7 @@ router.post('/', async (req, res) => {
 // Update project settings (color/dates/name) - JSON ONLY
 router.patch('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, themeColor, startDate, goLiveDate } = req.body;
+  const { name, themeColor, startDate, goLiveDate, backgroundUrl, logoUrl } = req.body;
   
   let updateData = {};
   if (name !== undefined) updateData.name = name;
