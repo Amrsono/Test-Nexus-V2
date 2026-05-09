@@ -49,16 +49,23 @@ const userRoutes = require('./routes/users');
 const reportRoutes = require('./routes/reports');
 const generatorRoutes = require('./routes/generator');
 const defectRoutes = require('./routes/defects');
+const authRoutes = require('./routes/auth');
+const subscriptionRoutes = require('./routes/subscriptions');
+const settingsRoutes = require('./routes/settings');
+const { auth, canImport } = require('./middleware/auth');
 
+app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/test-cases', testCaseRoutes);
-app.use('/api/upload', uploadRoutes);
+app.use('/api/upload', auth, canImport, uploadRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/insights', insightRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/reports', reportRoutes);
+app.use('/api/reports', auth, canImport, reportRoutes);
 app.use('/api/generator', generatorRoutes);
 app.use('/api/defects', defectRoutes);
+app.use('/api/subscriptions', subscriptionRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Export app for Vercel
 module.exports = app;

@@ -1,13 +1,24 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
+const { auth } = require('../middleware/auth');
+
+router.use(auth);
 
 // Get all test cases for a project
 router.get('/', async (req, res) => {
   const { projectId } = req.query;
   try {
+    const userProjects = await prisma.project.findMany({
+      where: req.user.role === 'ADMIN' ? {} : { ownerId: req.user.id },
+      select: { id: true }
+    });
+    const userProjectIds = userProjects.map(p => p.id);
+
     const testCases = await prisma.testCase.findMany({
-      where: projectId ? { suite: { projectId } } : {},
+      where: projectId 
+        ? { suite: { projectId, projectId: { in: userProjectIds } } } 
+        : { suite: { projectId: { in: userProjectIds } } },
       include: { suite: true, assignments: { include: { tester: true } } },
       orderBy: { createdAt: 'desc' }
     });
@@ -162,6 +173,12 @@ router.post('/bulk', async (req, res) => {
   }
 
   try {
+    // Check project ownership
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not own this project' });
+    }
     const result = await prisma.$transaction(async (tx) => {
       // 1. Create or find the test suite
       const suite = await tx.testSuite.create({

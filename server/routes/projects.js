@@ -4,11 +4,17 @@ const prisma = require('../lib/prisma');
 const multer = require('multer');
 
 const upload = multer({ storage: multer.memoryStorage() });
+const { auth } = require('../middleware/auth');
+
+// Apply auth to all routes
+router.use(auth);
 
 // Get all projects
 router.get('/', async (req, res) => {
   try {
+    const where = req.user.role === 'ADMIN' ? {} : { ownerId: req.user.id };
     const projects = await prisma.project.findMany({
+      where,
       include: { _count: { select: { testSuites: true } } },
       orderBy: { createdAt: 'asc' }
     });
@@ -42,7 +48,8 @@ router.post('/', async (req, res) => {
         name: name.trim(), 
         themeColor: themeColor || '#f8fafc',
         startDate: parseDate(startDate),
-        goLiveDate: parseDate(goLiveDate)
+        goLiveDate: parseDate(goLiveDate),
+        ownerId: req.user.id
       }
     });
     console.log(`[Production] Project created successfully: ${project.id}`);
@@ -137,9 +144,13 @@ router.post('/:id/reset', async (req, res) => {
   const { id: projectId } = req.params;
 
   try {
-    // Check if project exists
+    // Check if project exists and ownership
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not own this project' });
+    }
 
     // Find all test suites for the project
     const suites = await prisma.testSuite.findMany({ where: { projectId } });
@@ -170,6 +181,10 @@ router.delete('/:id', async (req, res) => {
   try {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
     if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not own this project' });
+    }
 
     const suites = await prisma.testSuite.findMany({ where: { projectId } });
     const suiteIds = suites.map(s => s.id);

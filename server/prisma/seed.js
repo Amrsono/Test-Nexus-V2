@@ -25,10 +25,26 @@ async function main() {
     createdProjects.push(project);
   }
 
+  const bcrypt = require('bcryptjs');
+  const adminPassword = await bcrypt.hash('Password@26', 10);
+
+  // Create Admin
+  await prisma.user.upsert({
+    where: { email: 'admin@testnexus.com' },
+    update: { password: adminPassword },
+    create: {
+      name: 'Admin',
+      email: 'admin@testnexus.com',
+      password: adminPassword,
+      role: 'ADMIN',
+      subscriptionStatus: 'ACTIVE'
+    }
+  });
+
   // Create Testers
   const testers = [
     { name: 'Alex Rivera', email: 'alex@testnexus.com' },
-    { name: 'Sarah Chen', email: 'sarah@testnexus.com' },
+    { name: 'Sarah Chen', email: 'sarah@testnexus.Chen' },
     { name: 'Mike Miller', email: 'mike@testnexus.com' },
   ];
 
@@ -39,7 +55,8 @@ async function main() {
       create: {
         name: t.name,
         email: t.email,
-        role: 'TESTER'
+        role: 'TESTER',
+        subscriptionStatus: 'ACTIVE'
       }
     });
   }

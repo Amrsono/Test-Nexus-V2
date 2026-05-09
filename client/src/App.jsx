@@ -7,9 +7,13 @@ import {
 import { 
   Activity, CheckCircle2, AlertCircle, Clock, 
   Upload, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
-  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers
+  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard
 } from 'lucide-react';
 import { io } from 'socket.io-client';
+import LoginScreen from './components/LoginScreen';
+import RegisterScreen from './components/RegisterScreen';
+import SubscriptionScreen from './components/SubscriptionScreen';
+import AdminSubscriptionManager from './components/AdminSubscriptionManager';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
@@ -54,6 +58,8 @@ const App = () => {
   const [newProjName, setNewProjName] = useState('');
 
   const [currentView, setCurrentView] = useState('dashboard'); // dashboard, lab
+  const [user, setUser] = useState(null);
+  const [authView, setAuthView] = useState('login'); // login, register
   const [labRequirements, setLabRequirements] = useState('');
   const [generatedScenarios, setGeneratedScenarios] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -68,7 +74,7 @@ const App = () => {
     raisedAt: new Date().toISOString().split('T')[0]
   });
 
-  const [localTheme, setLocalTheme] = useState('#f8fafc');
+  const [localTheme, setLocalTheme] = useState(() => localStorage.getItem('nexus_theme') || '#f8fafc');
 
   const [labConfig, setLabConfig] = useState({
     release: '',
@@ -82,6 +88,7 @@ const App = () => {
   });
   const [customJourneyType, setCustomJourneyType] = useState('');
   const [extraJourneys, setExtraJourneys] = useState([]);
+  const [subscriptionRequests, setSubscriptionRequests] = useState([]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -93,7 +100,15 @@ const App = () => {
   }, [selectedProject]);
 
   useEffect(() => {
-    fetchProjects();
+    const savedUser = localStorage.getItem('nexus_user');
+    const savedToken = localStorage.getItem('nexus_token');
+    if (savedUser && savedToken) {
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
+      fetchProjects();
+    }
+
     fetchTesters();
 
     socket.on('agent:status', (data) => {
@@ -102,6 +117,25 @@ const App = () => {
 
     return () => socket.off('agent:status');
   }, []);
+
+  const handleLogin = (data) => {
+    setUser(data.user);
+    localStorage.setItem('nexus_user', JSON.stringify(data.user));
+    localStorage.setItem('nexus_token', data.token);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+    fetchProjects();
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setProjects([]);
+    setSelectedProjectId(null);
+    setAllTestCases([]);
+    setStats({ total: 0, passed: 0, failed: 0, blocked: 0, pending: 0 });
+    localStorage.removeItem('nexus_user');
+    localStorage.removeItem('nexus_token');
+    delete axios.defaults.headers.common['Authorization'];
+  };
 
   const fetchDefects = async () => {
     if (!selectedProjectId) return;
@@ -751,6 +785,7 @@ const App = () => {
 
   const handleThemeChange = async (color) => {
     setLocalTheme(color);
+    localStorage.setItem('nexus_theme', color); // persist across refreshes instantly
     if (!selectedProjectId) return;
     try {
       const res = await axios.patch(`${API_BASE}/projects/${selectedProjectId}`, { themeColor: color });
@@ -820,13 +855,25 @@ const App = () => {
   const isDark = localTheme === '#1a1a2e' || localTheme === '#020617';
   const textColor = isDark ? 'text-white' : 'text-slate-900';
   const subTextColor = isDark ? 'text-slate-400' : 'text-slate-500';
-  const cardBg = isDark ? 'bg-white/5 border-white/10' : 'bg-white border-slate-100';
+  const cardBg = isDark ? 'bg-white/5 border border-white/10' : 'bg-white border-2 border-slate-400 shadow-md';
 
   const themes = [
     { name: 'Light', color: '#f8fafc' },
     { name: 'Burgundy', color: '#1a1a2e' },
     { name: 'Stealth', color: '#020617' }
   ];
+
+  if (!user) {
+    if (authView === 'register') {
+      return <RegisterScreen onRegister={handleLogin} onSwitchToLogin={() => setAuthView('login')} />;
+    }
+    return <LoginScreen onLogin={handleLogin} onSwitchToRegister={() => setAuthView('register')} />;
+  }
+
+  const isPremium = user.subscriptionStatus === 'ACTIVE';
+  const isTrial = !isPremium && user.role !== 'ADMIN';
+  const canImportFull = user.role === 'ADMIN' || isPremium;
+  const canMultipleProjects = user.role === 'ADMIN' || isPremium;
 
   return (
     <div 
@@ -884,9 +931,30 @@ const App = () => {
                 />
               ))}
             </div>
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100'} border ${isPremium ? 'border-emerald-500/30' : ''}`}>
+              <div className="flex flex-col items-end">
+                <span className={`text-[10px] font-bold ${textColor}`}>{user.name}</span>
+                <span className={`text-[8px] font-black uppercase tracking-widest ${user.role === 'ADMIN' ? 'text-primary' : isPremium ? 'text-emerald-400' : 'text-slate-500'}`}>
+                  {user.role}{isPremium && <span className="ml-1 inline-flex items-center gap-0.5">· <span className="text-emerald-400">★ PREMIUM</span></span>}{isTrial && <span className="text-amber-500 ml-1">(TRIAL)</span>}
+                </span>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-500 transition-all"
+                title="Logout"
+              >
+                <Lock size={16} />
+              </button>
+            </div>
             <button 
-              onClick={handleExportPPT}
-              className={`flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-600/20`}
+              onClick={(e) => {
+                if (!canImportFull) {
+                  alert('Trial Restriction: Exporting/Generating full reports is only available for premium subscribers (£100/mo). Upgrade to unlock.');
+                } else {
+                  handleExportPPT();
+                }
+              }}
+              className={`flex items-center gap-2 px-5 py-2.5 ${canImportFull ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-400 opacity-50 cursor-not-allowed'} text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-600/20`}
             >
               <Upload className="w-4 h-4 rotate-180" />
               Export Report
@@ -931,16 +999,24 @@ const App = () => {
                 </button>
               )}
             </div>
-            <label className="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 cursor-pointer">
+            <label 
+              className={`flex items-center gap-2 px-5 py-2.5 ${canImportFull ? 'bg-primary' : 'bg-slate-400 opacity-50 cursor-not-allowed'} text-white rounded-xl font-semibold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 cursor-pointer`}
+              onClick={(e) => {
+                if (!canImportFull) {
+                  e.preventDefault();
+                  alert('Trial Restriction: Importing reports or sheets is only available for premium subscribers (£100/mo). Upgrade to unlock.');
+                }
+              }}
+            >
               <Upload size={18} />
               Import
-              <input type="file" className="hidden" onChange={handleUpload} accept=".xlsx,.xls,.csv" />
+              {canImportFull && <input type="file" className="hidden" onChange={handleUpload} accept=".xlsx,.xls,.csv" />}
             </label>
           </div>
         </div>
 
         {/* Project Tabs */}
-        <div className={`flex gap-2 p-1 ${isDark ? 'bg-black/20' : 'bg-white/20'} backdrop-blur-sm rounded-2xl border ${isDark ? 'border-white/10' : 'border-white/40'} w-fit`}>
+        <div className={`flex gap-2 p-1 ${isDark ? 'bg-black/20' : 'bg-slate-100'} backdrop-blur-sm rounded-2xl border-2 ${isDark ? 'border-white/10' : 'border-slate-400'} w-fit`}>
           {projects.map(project => (
             <div key={project.id} className="relative group flex items-center">
               <button
@@ -968,15 +1044,21 @@ const App = () => {
             </div>
           ))}
           <button
-            onClick={handleCreateProject}
+            onClick={() => {
+              if (!canMultipleProjects && projects.length >= 1) {
+                alert('Multi-Project is a Premium feature (£100/mo). Upgrade your subscription to create additional projects.');
+                return;
+              }
+              handleCreateProject();
+            }}
             className={`px-4 py-2.5 rounded-xl font-bold flex items-center justify-center transition-all ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-slate-200'} border border-dashed border-slate-400/50`}
-            title="Create New Project"
+            title={canMultipleProjects ? 'Create New Project' : 'Upgrade to Premium for multiple projects'}
           >
             <Plus size={18} />
           </button>
         </div>
         {/* View Switcher */}
-        <div className={`flex gap-6 mt-4 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
+        <div className={`flex gap-6 mt-4 border-b-2 ${isDark ? 'border-white/10' : 'border-slate-400'}`}>
           <button 
             onClick={() => setCurrentView('dashboard')}
             className={`pb-4 px-2 text-sm font-bold transition-all relative ${
@@ -1000,15 +1082,45 @@ const App = () => {
             Scenario Lab
             {currentView === 'lab' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
+          <button 
+            onClick={() => setCurrentView('billing')}
+            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
+              currentView === 'billing' 
+              ? (isDark ? 'text-primary' : 'text-primary') 
+              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+            }`}
+          >
+            <CreditCard size={16} />
+            Billing
+            {currentView === 'billing' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+          </button>
+          {user.role === 'ADMIN' && (
+            <button 
+              onClick={() => setCurrentView('admin-subs')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
+                currentView === 'admin-subs' 
+                ? (isDark ? 'text-primary' : 'text-primary') 
+                : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+              }`}
+            >
+              <Users size={16} />
+              Subscription Requests
+              {currentView === 'admin-subs' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+            </button>
+          )}
         </div>
       </header>
-      {loading && !selectedProjectId ? (
+      {loading && !selectedProjectId && currentView !== 'billing' && currentView !== 'admin-subs' ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : (
         <>
-          {currentView === 'dashboard' ? (
+          {currentView === 'billing' ? (
+            <SubscriptionScreen user={user} onBack={() => setCurrentView('dashboard')} onStatusUpdate={(u) => { setUser(u); localStorage.setItem('nexus_user', JSON.stringify(u)); }} />
+          ) : currentView === 'admin-subs' ? (
+            <AdminSubscriptionManager />
+          ) : currentView === 'dashboard' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
               {/* Top Hero: Executive Summary */}
@@ -2062,9 +2174,6 @@ const App = () => {
           </div>
         </div>
       )}
-    </>
-
-  )}
 
 
 
@@ -2391,12 +2500,14 @@ const App = () => {
           </div>
         </div>
       )}
+    </>
+  )}
     </div>
   );
 };
 
 const MetricCard = ({ label, value, icon, change, trend = 'up', isDark, status }) => (
-  <div className={`${isDark ? 'bg-slate-800/50 border-white/10' : 'bg-white border-slate-200'} p-6 rounded-3xl border shadow-lg transition-all hover:scale-[1.02]`}>
+  <div className={`${isDark ? 'bg-slate-800/50 border border-white/10' : 'bg-white border-2 border-slate-400'} p-6 rounded-3xl shadow-md transition-all hover:scale-[1.02]`}>
     <div className="flex justify-between items-start mb-4">
       <div className={`p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
         {icon}

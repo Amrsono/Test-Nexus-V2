@@ -7,7 +7,10 @@ const { parseTestCases } = require('../services/aiParser');
 
 const upload = multer({ storage: multer.memoryStorage() });
 
+const { auth } = require('../middleware/auth');
 const { emitStatus } = require('../socket');
+
+router.use(auth);
 
 router.post('/', upload.single('file'), async (req, res) => {
   try {
@@ -99,9 +102,9 @@ router.post('/', upload.single('file'), async (req, res) => {
       };
       const themeColor = themeMap[aiProject.suggestedTheme?.toUpperCase()] || "#f8fafc";
 
-      // Search by name first to avoid duplicates
+      // Search by name first, scoped to this user, to avoid duplicates
       const existingByName = await prisma.project.findFirst({
-        where: { name: aiProject.name }
+        where: { name: aiProject.name, ownerId: req.user.id }
       });
 
       if (existingByName) {
@@ -112,7 +115,8 @@ router.post('/', upload.single('file'), async (req, res) => {
         const newProject = await prisma.project.create({
           data: {
             name: aiProject.name,
-            themeColor: themeColor
+            themeColor: themeColor,
+            ownerId: req.user.id
           }
         });
         targetProjectId = newProject.id;
@@ -126,14 +130,14 @@ router.post('/', upload.single('file'), async (req, res) => {
         ? manualProjectName
         : (req.file?.originalname ? req.file.originalname.replace(/\.[^.]+$/, '') : 'Manual Import Project');
 
-      // Check if a project with this name already exists
-      const existingProject = await prisma.project.findFirst({ where: { name: fallbackName } });
+      // Check if a project with this name already exists for this user
+      const existingProject = await prisma.project.findFirst({ where: { name: fallbackName, ownerId: req.user.id } });
       if (existingProject) {
         emitStatus('System: Syncing with existing project...');
         targetProjectId = existingProject.id;
       } else {
         const newProject = await prisma.project.create({
-          data: { name: fallbackName, themeColor: '#f8fafc' }
+          data: { name: fallbackName, themeColor: '#f8fafc', ownerId: req.user.id }
         });
         targetProjectId = newProject.id;
       }
