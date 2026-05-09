@@ -292,7 +292,8 @@ const App = () => {
       setSelectedProjectId(res.data.id);
     } catch (err) {
       console.error('Create project failed', err);
-      const errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+      let errorMsg = err.response?.data?.error || err.message || 'Unknown error';
+      if (typeof errorMsg === 'object') errorMsg = errorMsg.message || JSON.stringify(errorMsg);
       alert(`Failed to create project: ${errorMsg}`);
     } finally {
       setLoading(false);
@@ -710,13 +711,15 @@ const App = () => {
       setAgentLogs(prev => [...prev, 'System: Scenarios drafted successfully.']);
     } catch (err) {
       console.error('Generation failed', err);
-      const isQuota = err.response?.data?.error === 'AI_QUOTA_EXCEEDED' || err.message?.includes('429');
+      let errorObj = err.response?.data?.error;
+      const isQuota = errorObj === 'AI_QUOTA_EXCEEDED' || err.message?.includes('429');
       
       if (isQuota) {
         setAgentLogs(prev => [...prev, 'System: AI is currently busy. Please wait 30s and try again.']);
         alert('AI Quota Exceeded: Gemini is processing too many requests right now. Please wait about 30-60 seconds before trying again.');
       } else {
-        alert('Failed to generate scenarios. Please check your API key or requirements complexity.');
+        let msg = typeof errorObj === 'object' ? (errorObj.message || JSON.stringify(errorObj)) : errorObj;
+        alert(`Failed to generate scenarios. ${msg || 'Please check your API key or requirements complexity.'}`);
       }
     } finally {
       setIsGenerating(false);
