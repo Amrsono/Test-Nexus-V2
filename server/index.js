@@ -67,6 +67,11 @@ app.use('/api/defects', defectRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/settings', settingsRoutes);
 
+// Catch-all 404 handler to return JSON instead of HTML
+app.use((req, res) => {
+  res.status(404).json({ error: `Express 404: Cannot ${req.method} ${req.url} (originalUrl: ${req.originalUrl})` });
+});
+
 // Export app for Vercel
 module.exports = app;
 
