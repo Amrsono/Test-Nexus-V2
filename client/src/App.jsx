@@ -160,10 +160,11 @@ const App = () => {
     delete axios.defaults.headers.common['Authorization'];
   };
 
-  const fetchDefects = async () => {
-    if (!selectedProjectId) return;
+  const fetchDefects = async (projectIdOverride) => {
+    const id = projectIdOverride || selectedProjectId;
+    if (!id) return;
     try {
-      const res = await axios.get(`${API_BASE}/defects?projectId=${selectedProjectId}`);
+      const res = await axios.get(`${API_BASE}/defects?projectId=${id}`);
       setDefects(res.data);
     } catch (err) {
       console.error('Fetch Defects Error:', err);
@@ -172,16 +173,16 @@ const App = () => {
 
   useEffect(() => {
     if (selectedProjectId) {
-      fetchStats();
-      fetchInsights();
-      fetchUnassigned();
-      fetchAllTestCases();
-      fetchBurndown();
-      fetchDefects();
+      fetchStats(selectedProjectId);
+      fetchInsights(selectedProjectId);
+      fetchUnassigned(selectedProjectId);
+      fetchAllTestCases(selectedProjectId);
+      fetchBurndown(selectedProjectId);
+      fetchDefects(selectedProjectId);
       const interval = setInterval(() => {
-        fetchInsights();
-        fetchDefects();
-      }, 30000); // Higher frequency for critical alerts
+        fetchInsights(selectedProjectId);
+        fetchDefects(selectedProjectId);
+      }, 30000); 
       return () => clearInterval(interval);
     }
   }, [selectedProjectId]);
@@ -432,9 +433,11 @@ const App = () => {
     }
   };
 
-  const fetchInsights = async () => {
+  const fetchInsights = async (projectIdOverride) => {
+    const id = projectIdOverride || selectedProjectId;
+    if (!id) return;
     try {
-      const res = await axios.get(`${API_BASE}/insights?projectId=${selectedProjectId}`);
+      const res = await axios.get(`${API_BASE}/insights?projectId=${id}`);
       setInsights(res.data);
       setLoading(false);
     } catch (err) {

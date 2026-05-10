@@ -18,7 +18,12 @@ router.get('/', async (req, res) => {
 
     const insights = await prisma.insight.findMany({
       where: projectId 
-        ? { projectId, projectId: { in: userProjectIds } } 
+        ? { 
+            AND: [
+              { projectId: projectId },
+              { projectId: { in: userProjectIds } }
+            ] 
+          } 
         : { projectId: { in: userProjectIds } },
       orderBy: { createdAt: 'desc' },
       take: 5
