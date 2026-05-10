@@ -1059,7 +1059,9 @@ const App = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    handleDeleteProject(project.id, project.name);
+                    // Close = deselect: switch to next available project or null
+                    const others = projects.filter(p => p.id !== project.id);
+                    setSelectedProjectId(others.length > 0 ? others[0].id : null);
                   }}
                   className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
                   title="Close Project"
