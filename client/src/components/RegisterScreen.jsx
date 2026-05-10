@@ -17,7 +17,9 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
       const res = await axios.post(`${API_BASE}/auth/register`, formData);
       onRegister(res.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed.');
+      let errMsg = err.response?.data?.error || err.message || 'Registration failed.';
+      if (typeof errMsg === 'object') errMsg = errMsg.message || JSON.stringify(errMsg);
+      setError(errMsg);
     } finally {
       setLoading(false);
     }

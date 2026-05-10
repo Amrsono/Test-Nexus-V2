@@ -21,6 +21,29 @@ const socket = io(isLocal ? 'http://localhost:5000' : window.location.origin, {
   transports: ['websocket', 'polling']
 });
 
+const MetricCard = ({ label, value, icon, change, trend, isDark }) => (
+  <div className={`p-6 rounded-3xl border-2 transition-all hover:scale-105 duration-300 ${isDark ? 'bg-white/5 border-white/10 shadow-lg' : 'bg-white border-slate-400 shadow-xl'}`}>
+    <div className="flex justify-between items-start mb-4">
+      <div className={`p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-slate-100'} shadow-sm`}>
+        {icon}
+      </div>
+      {change && (
+        <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex items-center gap-1 ${
+          trend === 'up' ? 'text-emerald-500 bg-emerald-500/10' : 
+          trend === 'down' ? 'text-rose-500 bg-rose-500/10' : 
+          'text-slate-500 bg-slate-500/10'
+        }`}>
+          {trend === 'up' && <ArrowUpRight size={14} />}
+          {trend === 'down' && <TrendingDown size={14} />}
+          {change}
+        </span>
+      )}
+    </div>
+    <h3 className={`text-3xl font-black mb-1 ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</h3>
+    <p className={`text-sm font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{label}</p>
+  </div>
+);
+
 const App = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
@@ -2509,26 +2532,6 @@ const App = () => {
   );
 };
 
-const MetricCard = ({ label, value, icon, change, trend = 'up', isDark, status }) => (
-  <div className={`${isDark ? 'bg-slate-800/50 border border-white/10' : 'bg-white border-2 border-slate-400'} p-6 rounded-3xl shadow-md transition-all hover:scale-[1.02]`}>
-    <div className="flex justify-between items-start mb-4">
-      <div className={`p-3 rounded-2xl ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-        {icon}
-      </div>
-      {change && (
-        <span className={`text-[10px] font-bold px-2 py-1 rounded-full ${trend === 'up' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-          {change}
-        </span>
-      )}
-      {status && (
-        <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-primary/10 text-primary uppercase tracking-widest">
-          {status}
-        </span>
-      )}
-    </div>
-    <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'} mb-1`}>{label}</p>
-    <h4 className={`text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</h4>
-  </div>
-);
+
 
 export default App;

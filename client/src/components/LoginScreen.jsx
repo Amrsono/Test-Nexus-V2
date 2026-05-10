@@ -18,7 +18,9 @@ const LoginScreen = ({ onLogin, onSwitchToRegister }) => {
       const res = await axios.post(`${API_BASE}/auth/login`, { email, password });
       onLogin(res.data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed. Check your credentials.');
+      let errMsg = err.response?.data?.error || err.message || 'Login failed. Check your credentials.';
+      if (typeof errMsg === 'object') errMsg = errMsg.message || JSON.stringify(errMsg);
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
