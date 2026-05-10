@@ -59,7 +59,7 @@ const LoginScreen = ({ onLogin, onSwitchToRegister }) => {
                 <input
                   type="text"
                   required
-                  placeholder="admin@testnexus.com"
+                  placeholder="Enter your email"
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all placeholder:text-slate-600"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -74,7 +74,7 @@ const LoginScreen = ({ onLogin, onSwitchToRegister }) => {
                 <input
                   type="password"
                   required
-                  placeholder="••••••••"
+                  placeholder="Enter your password"
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-500/40 transition-all placeholder:text-slate-600"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
