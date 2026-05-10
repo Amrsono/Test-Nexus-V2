@@ -112,6 +112,7 @@ const App = () => {
   const [customJourneyType, setCustomJourneyType] = useState('');
   const [extraJourneys, setExtraJourneys] = useState([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
+  const [hiddenProjectIds, setHiddenProjectIds] = useState([]);
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -283,10 +284,13 @@ const App = () => {
   const fetchProjects = async () => {
     try {
       const res = await axios.get(`${API_BASE}/projects`);
-      setProjects(res.data);
-      if (res.data.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(res.data[0].id);
-      } else if (res.data.length === 0) {
+      // Filter out any projects the user has "closed" in this session
+      const visibleProjects = res.data.filter(p => !hiddenProjectIds.includes(p.id));
+      setProjects(visibleProjects);
+      
+      if (visibleProjects.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(visibleProjects[0].id);
+      } else if (visibleProjects.length === 0) {
         setLoading(false);
       }
     } catch (err) {
@@ -1062,9 +1066,17 @@ const App = () => {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    // Close = deselect: switch to next available project or null
-                    const others = projects.filter(p => p.id !== project.id);
-                    setSelectedProjectId(others.length > 0 ? others[0].id : null);
+                    // Close = remove from UI list
+                    const remaining = projects.filter(p => p.id !== project.id);
+                    setProjects(remaining);
+                    setHiddenProjectIds(prev => [...prev, project.id]);
+                    
+                    // Switch selection to another project if one exists
+                    if (remaining.length > 0) {
+                      setSelectedProjectId(remaining[0].id);
+                    } else {
+                      setSelectedProjectId(null);
+                    }
                   }}
                   className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
                   title="Close Project"
