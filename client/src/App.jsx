@@ -192,44 +192,50 @@ const App = () => {
     }
   }, [selectedProjectId]);
 
-  // Sync Drafts with LocalStorage for persistence across tabs/refresh (USER ISOLATED)
+  // Sync Drafts with LocalStorage for persistence across tabs/refresh (USER & PROJECT ISOLATED)
   useEffect(() => {
-    if (!user || !hasLoadedDrafts) return;
+    if (!user || !hasLoadedDrafts || !selectedProjectId) return;
     
-    const savedDrafts = localStorage.getItem(`nexus_drafts_${user.id}`);
+    const draftKey = `nexus_drafts_${user.id}_${selectedProjectId}`;
+    const reqsKey = `nexus_lab_reqs_${user.id}_${selectedProjectId}`;
+    
+    const savedDrafts = localStorage.getItem(draftKey);
     if (savedDrafts) {
       try {
         setGeneratedScenarios(JSON.parse(savedDrafts));
       } catch (e) {
         console.error('Failed to load drafts', e);
+        setGeneratedScenarios([]);
       }
+    } else {
+      setGeneratedScenarios([]);
     }
     
-    const savedReqs = localStorage.getItem(`nexus_lab_reqs_${user.id}`);
-    if (savedReqs) setLabRequirements(savedReqs);
+    const savedReqs = localStorage.getItem(reqsKey);
+    setLabRequirements(savedReqs || '');
 
     setHasLoadedDrafts(true);
-  }, [user?.id]);
+  }, [user?.id, selectedProjectId]);
 
   useEffect(() => {
-    if (user && hasLoadedDrafts) {
-      localStorage.setItem(`nexus_drafts_${user.id}`, JSON.stringify(generatedScenarios));
+    if (user && hasLoadedDrafts && selectedProjectId) {
+      localStorage.setItem(`nexus_drafts_${user.id}_${selectedProjectId}`, JSON.stringify(generatedScenarios));
     }
-  }, [generatedScenarios, hasLoadedDrafts, user?.id]);
+  }, [generatedScenarios, hasLoadedDrafts, user?.id, selectedProjectId]);
 
   useEffect(() => {
-    if (user && hasLoadedDrafts) {
-      localStorage.setItem(`nexus_lab_reqs_${user.id}`, labRequirements);
+    if (user && hasLoadedDrafts && selectedProjectId) {
+      localStorage.setItem(`nexus_lab_reqs_${user.id}_${selectedProjectId}`, labRequirements);
     }
-  }, [labRequirements, hasLoadedDrafts, user?.id]);
+  }, [labRequirements, hasLoadedDrafts, user?.id, selectedProjectId]);
 
   const clearDrafts = () => {
     if (window.confirm('Are you sure you want to discard all current drafts?')) {
       setGeneratedScenarios([]);
       setLabRequirements('');
-      if (user) {
-        localStorage.removeItem(`nexus_drafts_${user.id}`);
-        localStorage.removeItem(`nexus_lab_reqs_${user.id}`);
+      if (user && selectedProjectId) {
+        localStorage.removeItem(`nexus_drafts_${user.id}_${selectedProjectId}`);
+        localStorage.removeItem(`nexus_lab_reqs_${user.id}_${selectedProjectId}`);
       }
     }
   };
