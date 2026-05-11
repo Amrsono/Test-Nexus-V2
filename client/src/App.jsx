@@ -131,7 +131,16 @@ const App = () => {
       const parsedUser = JSON.parse(savedUser);
       setUser(parsedUser);
       axios.defaults.headers.common['Authorization'] = `Bearer ${savedToken}`;
-      fetchProjects();
+      
+      // Load hidden projects for this user
+      const savedHidden = localStorage.getItem(`nexus_hidden_projects_${parsedUser.id}`);
+      let hidden = [];
+      if (savedHidden) {
+        hidden = JSON.parse(savedHidden);
+        setHiddenProjectIds(hidden);
+      }
+      
+      fetchProjects(hidden);
     }
 
     fetchTesters();
@@ -148,7 +157,18 @@ const App = () => {
     localStorage.setItem('nexus_user', JSON.stringify(data.user));
     localStorage.setItem('nexus_token', data.token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
-    fetchProjects();
+    
+    // Load hidden projects for the user
+    const savedHidden = localStorage.getItem(`nexus_hidden_projects_${data.user.id}`);
+    let hidden = [];
+    if (savedHidden) {
+      hidden = JSON.parse(savedHidden);
+      setHiddenProjectIds(hidden);
+    } else {
+      setHiddenProjectIds([]);
+    }
+
+    fetchProjects(hidden);
   };
 
   const handleLogout = () => {
@@ -158,6 +178,7 @@ const App = () => {
     setAllTestCases([]);
     setGeneratedScenarios([]);
     setLabRequirements('');
+    setHiddenProjectIds([]);
     setStats({ total: 0, passed: 0, failed: 0, blocked: 0, pending: 0 });
     localStorage.removeItem('nexus_user');
     localStorage.removeItem('nexus_token');
@@ -230,6 +251,13 @@ const App = () => {
     }
   }, [labRequirements, hasLoadedDrafts, user?.id, selectedProjectId]);
 
+  // Persist hidden projects
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(`nexus_hidden_projects_${user.id}`, JSON.stringify(hiddenProjectIds));
+    }
+  }, [hiddenProjectIds, user?.id]);
+
   const clearDrafts = () => {
     if (window.confirm('Are you sure you want to discard all current drafts?')) {
       setGeneratedScenarios([]);
@@ -296,11 +324,12 @@ const App = () => {
     }
   };
 
-  const fetchProjects = async () => {
+  const fetchProjects = async (hiddenOverride) => {
     try {
       const res = await axios.get(`${API_BASE}/projects`);
-      // Filter out any projects the user has "closed" in this session
-      const visibleProjects = res.data.filter(p => !hiddenProjectIds.includes(p.id));
+      // Filter out any projects the user has "closed"
+      const hiddenList = hiddenOverride || hiddenProjectIds;
+      const visibleProjects = res.data.filter(p => !hiddenList.includes(p.id));
       setProjects(visibleProjects);
       
       if (visibleProjects.length > 0 && !selectedProjectId) {
