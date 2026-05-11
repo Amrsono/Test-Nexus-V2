@@ -1,11 +1,9 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const dotenv = require('dotenv');
 const path = require('path');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
-
-const genAI = process.env.GEMINI_API_KEY 
-  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-  : null;
 
 /**
  * AI Generator Service
@@ -16,9 +14,22 @@ const generateScenarios = async (requirements, onProgress, options = {}) => {
   let lastError;
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   
-  if (!genAI) {
-    throw new Error('GEMINI_API_KEY is not configured.');
+  // Fetch API key dynamically from settings
+  let apiKey = process.env.GEMINI_API_KEY;
+  try {
+    const setting = await prisma.systemSettings.findUnique({ where: { key: 'GEMINI_API_KEY' } });
+    if (setting && setting.value) {
+      apiKey = setting.value;
+    }
+  } catch (err) {
+    console.error('Error fetching GEMINI_API_KEY from settings:', err);
   }
+
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured in settings or .env file.');
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
 
   // Construct Scope Context from options
   const scopeContext = `

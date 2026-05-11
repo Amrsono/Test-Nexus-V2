@@ -35,8 +35,10 @@ const AdminDashboard = () => {
     VODAFONE_NUMBER: '',
     PAYPAL_EMAIL: '',
     PAYONEER_EMAIL: '',
-    SUBSCRIPTION_COST: '100'
+    SUBSCRIPTION_COST: '100',
+    GEMINI_API_KEY: ''
   });
+
 
   // Filter States
   const [userSearch, setUserSearch] = useState('');
@@ -518,6 +520,16 @@ const AdminDashboard = () => {
                       value={settings.PAYONEER_EMAIL}
                       onChange={(e) => setSettings({...settings, PAYONEER_EMAIL: e.target.value})}
                       placeholder="payouts@yourdomain.com"
+                    />
+                  </div>
+                  <div className="space-y-3 md:col-span-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 ml-4">Google Gemini API Key</label>
+                    <input 
+                      type="password"
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm text-white focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-mono"
+                      value={settings.GEMINI_API_KEY}
+                      onChange={(e) => setSettings({...settings, GEMINI_API_KEY: e.target.value})}
+                      placeholder="AIxxx... (Leave blank to use .env default)"
                     />
                   </div>
                 </div>

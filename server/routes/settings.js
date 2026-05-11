@@ -8,7 +8,9 @@ router.get('/public', auth, async (req, res) => {
   try {
     const settings = await prisma.systemSettings.findMany();
     const publicSettings = settings.reduce((acc, s) => {
-      acc[s.key] = s.value;
+      if (s.key !== 'GEMINI_API_KEY') {
+        acc[s.key] = s.value;
+      }
       return acc;
     }, {});
     res.json(publicSettings);
