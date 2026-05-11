@@ -8,7 +8,7 @@ import {
 import { 
   Activity, CheckCircle2, AlertCircle, Clock, 
   Upload, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
-  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard
+  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard, Shield
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import LoginScreen from './components/LoginScreen';
