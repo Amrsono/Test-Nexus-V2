@@ -83,6 +83,17 @@ const AdminDashboard = () => {
     }
   };
 
+  const deleteProject = async (projectId) => {
+    if (!window.confirm('PERMANENT ACTION: Are you sure you want to delete this project and ALL its data (suites, cases, defects)? This cannot be undone.')) return;
+    try {
+      await axios.delete(`${API_BASE}/projects/${projectId}`);
+      fetchAllData();
+      alert('Project deleted successfully');
+    } catch (err) {
+      alert('Deletion failed: ' + (err.response?.data?.error || err.message));
+    }
+  };
+
   const updateUserProfile = async (userId, data) => {
     try {
       await axios.patch(`${API_BASE}/users/${userId}/admin`, data);
@@ -434,9 +445,18 @@ const AdminDashboard = () => {
                       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Suites</p>
                       <p className="text-xl font-black">{proj._count?.testSuites || 0}</p>
                     </div>
-                    <div className="bg-white/5 rounded-2xl p-4">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</p>
-                      <p className="text-xs font-bold text-emerald-500">LIVE</p>
+                    <div className="flex flex-col gap-2">
+                      <div className="bg-white/5 rounded-2xl p-4 flex-1">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">Status</p>
+                        <p className="text-xs font-bold text-emerald-500">LIVE</p>
+                      </div>
+                      <button 
+                        onClick={() => deleteProject(proj.id)}
+                        className="p-3 bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white rounded-2xl transition-all flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest"
+                      >
+                        <Trash2 size={14} />
+                        Delete
+                      </button>
                     </div>
                   </div>
                 </div>
