@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Analytics } from '@vercel/analytics/react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell 
@@ -13,7 +14,7 @@ import { io } from 'socket.io-client';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import SubscriptionScreen from './components/SubscriptionScreen';
-import AdminSubscriptionManager from './components/AdminSubscriptionManager';
+import AdminDashboard from './components/AdminDashboard';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
@@ -1153,16 +1154,16 @@ const App = () => {
           </button>
           {user.role === 'ADMIN' && (
             <button 
-              onClick={() => setCurrentView('admin-subs')}
+              onClick={() => setCurrentView('admin')}
               className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-                currentView === 'admin-subs' 
+                currentView === 'admin' 
                 ? (isDark ? 'text-primary' : 'text-primary') 
                 : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
               }`}
             >
-              <Users size={16} />
-              Subscription Requests
-              {currentView === 'admin-subs' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+              <Shield size={16} />
+              System Admin
+              {currentView === 'admin' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
             </button>
           )}
         </div>
@@ -1175,8 +1176,8 @@ const App = () => {
         <>
           {currentView === 'billing' ? (
             <SubscriptionScreen user={user} onBack={() => setCurrentView('dashboard')} onStatusUpdate={(u) => { setUser(u); localStorage.setItem('nexus_user', JSON.stringify(u)); }} />
-          ) : currentView === 'admin-subs' ? (
-            <AdminSubscriptionManager />
+          ) : currentView === 'admin' ? (
+            <AdminDashboard />
           ) : currentView === 'dashboard' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
@@ -2558,7 +2559,8 @@ const App = () => {
         </div>
       )}
     </>
-  )}
+      )}
+      <Analytics />
     </div>
   );
 };
