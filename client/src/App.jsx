@@ -716,14 +716,42 @@ const App = () => {
     }
   };
 
-  const handleExportPPT = () => {
+  const handleExportPPT = async () => {
     if (!selectedProjectId) {
       alert("Please select a project first.");
       return;
     }
 
-    // Standard download trigger via backend-generated binary with cache-buster
-    window.open(`${API_BASE}/reports/project/${selectedProjectId}/ppt?t=${new Date().getTime()}`, '_blank');
+    // Must use axios (not window.open) so the Authorization header is included
+    try {
+      setLoading(true);
+      const res = await axios.get(`${API_BASE}/reports/project/${selectedProjectId}/ppt`, {
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([res.data], {
+        type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      const safeFileName = `${(selectedProject?.name || 'Report').replace(/[^a-z0-9]/gi, '_')}_Status_Report.pptx`;
+      link.setAttribute('download', safeFileName);
+      document.body.appendChild(link);
+      link.click();
+
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err) {
+      console.error('PPT Export Error:', err);
+      const msg = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to export report: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const updateCaseStatus = async (caseId, status) => {
