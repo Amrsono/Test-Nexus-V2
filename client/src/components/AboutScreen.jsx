@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Github, Info, Shield, Zap, Globe } from 'lucide-react';
+import { Mail, GitBranch, Info, Shield, Zap, Globe } from 'lucide-react';
 
 const AboutScreen = ({ isDark }) => {
   const textColor = isDark ? 'text-white' : 'text-slate-900';
@@ -66,7 +66,7 @@ const AboutScreen = ({ isDark }) => {
               rel="noopener noreferrer"
               className={`flex items-center gap-3 px-6 py-4 rounded-xl border transition-all hover:scale-105 ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' : 'bg-white border-slate-200 hover:border-primary text-slate-800 shadow-sm'}`}
             >
-              <Github className={`${isDark ? 'text-white' : 'text-slate-900'}`} />
+              <GitBranch className={`${isDark ? 'text-white' : 'text-slate-900'}`} />
               <div className="text-left">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">GitHub</p>
                 <p className="font-medium">github.com/Amrsono</p>
