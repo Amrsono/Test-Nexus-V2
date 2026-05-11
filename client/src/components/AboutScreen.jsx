@@ -50,13 +50,13 @@ const AboutScreen = ({ isDark }) => {
           
           <div className="flex flex-col sm:flex-row gap-4">
             <a 
-              href="mailto:amr.f.sono@gmail.com" 
+              href="mailto:amrsono@gmail.com" 
               className={`flex items-center gap-3 px-6 py-4 rounded-xl border transition-all hover:scale-105 ${isDark ? 'bg-white/5 border-white/10 hover:bg-white/10 text-white' : 'bg-white border-slate-200 hover:border-primary text-slate-800 shadow-sm'}`}
             >
               <Mail className="text-rose-500" />
               <div className="text-left">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Email</p>
-                <p className="font-medium">amr.f.sono@gmail.com</p>
+                <p className="font-medium">amrsono@gmail.com</p>
               </div>
             </a>
             
