@@ -8,13 +8,15 @@ import {
 import { 
   Activity, CheckCircle2, AlertCircle, Clock, 
   Upload, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
-  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard, Shield
+  ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard, Shield, HelpCircle, Info
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import SubscriptionScreen from './components/SubscriptionScreen';
 import AdminDashboard from './components/AdminDashboard';
+import HelpScreen from './components/HelpScreen';
+import AboutScreen from './components/AboutScreen';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
@@ -1223,6 +1225,30 @@ const App = () => {
               {currentView === 'admin' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
             </button>
           )}
+          <button 
+            onClick={() => setCurrentView('help')}
+            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
+              currentView === 'help' 
+              ? (isDark ? 'text-primary' : 'text-primary') 
+              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+            }`}
+          >
+            <HelpCircle size={16} />
+            Help
+            {currentView === 'help' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+          </button>
+          <button 
+            onClick={() => setCurrentView('about')}
+            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
+              currentView === 'about' 
+              ? (isDark ? 'text-primary' : 'text-primary') 
+              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+            }`}
+          >
+            <Info size={16} />
+            About
+            {currentView === 'about' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+          </button>
         </div>
       </header>
       {loading && !selectedProjectId && currentView !== 'billing' && currentView !== 'admin-subs' ? (
@@ -1235,6 +1261,10 @@ const App = () => {
             <SubscriptionScreen user={user} onBack={() => setCurrentView('dashboard')} onStatusUpdate={(u) => { setUser(u); localStorage.setItem('nexus_user', JSON.stringify(u)); }} />
           ) : currentView === 'admin' ? (
             <AdminDashboard />
+          ) : currentView === 'help' ? (
+            <HelpScreen isDark={isDark} />
+          ) : currentView === 'about' ? (
+            <AboutScreen isDark={isDark} />
           ) : currentView === 'dashboard' ? (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
