@@ -842,6 +842,32 @@ const App = () => {
     }
   };
 
+  const updateCaseCustomValidation = async (caseId, customVpId, isChecked) => {
+    try {
+      const tc = allTestCases.find(c => c.id === caseId);
+      if (!tc) return;
+      
+      let customList = [];
+      try {
+        customList = typeof tc.customValidations === 'string' 
+          ? JSON.parse(tc.customValidations) 
+          : (tc.customValidations || []);
+      } catch (err) {
+        console.error(err);
+      }
+      
+      const updatedList = customList.map(cv => cv.id === customVpId ? { ...cv, checked: isChecked } : cv);
+      
+      await axios.patch(`${API_BASE}/test-cases/${caseId}/validations`, {
+        customValidations: JSON.stringify(updatedList)
+      });
+      
+      setAllTestCases(prev => prev.map(c => c.id === caseId ? { ...c, customValidations: JSON.stringify(updatedList) } : c));
+    } catch (err) {
+      console.error('Custom validation update failed', err);
+    }
+  };
+
   const updateCaseAssignment = async (caseId, testerId) => {
     try {
       await axios.post(`${API_BASE}/assignments/assign`, {
@@ -963,7 +989,40 @@ const App = () => {
 
   const openEditScenario = (index) => {
     setEditingScenarioIndex(index);
-    setEditingScenarioData({ ...generatedScenarios[index] });
+    const scenario = generatedScenarios[index];
+    
+    // Normalize validation points into a dynamic list
+    const validationPoints = [];
+    if (scenario.orderBuild) validationPoints.push({ id: 'orderBuild', label: 'Order Build', value: scenario.orderBuild });
+    if (scenario.orderCompletion) validationPoints.push({ id: 'orderCompletion', label: 'Status Sync', value: scenario.orderCompletion });
+    if (scenario.tcAssurance) validationPoints.push({ id: 'tcAssurance', label: 'T&C / Comms', value: scenario.tcAssurance });
+    if (scenario.billing) validationPoints.push({ id: 'billing', label: 'Billing', value: scenario.billing });
+
+    if (scenario.customValidations) {
+      try {
+        const customList = typeof scenario.customValidations === 'string' ? JSON.parse(scenario.customValidations) : scenario.customValidations;
+        if (Array.isArray(customList)) {
+          customList.forEach((cv, idx) => {
+            // Avoid duplicate additions if standard fields already covered it
+            if (!validationPoints.some(vp => vp.label.toLowerCase() === (cv.label || '').toLowerCase())) {
+              validationPoints.push({
+                id: cv.id || `custom_${Date.now()}_${idx}`,
+                label: cv.label || 'Custom Check',
+                value: cv.value || '',
+                checked: cv.checked || false
+              });
+            }
+          });
+        }
+      } catch (err) {
+        console.error('Error parsing custom validations in openEditScenario', err);
+      }
+    }
+
+    setEditingScenarioData({ 
+      ...scenario, 
+      validationPoints 
+    });
     setIsEditScenarioModalOpen(true);
   };
 
@@ -973,23 +1032,66 @@ const App = () => {
     
     const applyToAll = window.confirm("Would you like to apply these validation points to all scenarios in your draft?");
     
+    // Serialize validationPoints back to standard fields and customValidations
+    const serialized = (() => {
+      let orderBuild = null;
+      let orderCompletion = null;
+      let tcAssurance = null;
+      let billing = null;
+      const customValidations = [];
+
+      (editingScenarioData.validationPoints || []).forEach(vp => {
+        const labelLower = (vp.label || '').toLowerCase();
+        if (vp.id === 'orderBuild' || labelLower === 'order build' || labelLower === 'order build / pricing') {
+          orderBuild = vp.value || null;
+        } else if (vp.id === 'orderCompletion' || labelLower === 'status sync' || labelLower === 'completion' || labelLower === 'status sync / completion') {
+          orderCompletion = vp.value || null;
+        } else if (vp.id === 'tcAssurance' || labelLower === 't&c / comms' || labelLower === 't&c / comms assurance' || labelLower === 'tc assurance' || labelLower === 't&c assurance') {
+          tcAssurance = vp.value || null;
+        } else if (vp.id === 'billing' || labelLower === 'billing' || labelLower === 'billing expectations') {
+          billing = vp.value || null;
+        } else {
+          customValidations.push({
+            id: vp.id,
+            label: vp.label,
+            value: vp.value,
+            checked: vp.checked || false
+          });
+        }
+      });
+
+      return {
+        orderBuild,
+        orderCompletion,
+        tcAssurance,
+        billing,
+        customValidations: customValidations.length > 0 ? customValidations : null
+      };
+    })();
+
+    const savedScenario = {
+      ...editingScenarioData,
+      ...serialized
+    };
+    delete savedScenario.validationPoints; // clean temporary field
+
     let updated;
     if (applyToAll) {
-      const { orderBuild, orderCompletion, tcAssurance, billing } = editingScenarioData;
       updated = generatedScenarios.map((s, i) => {
-        if (i === editingScenarioIndex) return editingScenarioData;
+        if (i === editingScenarioIndex) return savedScenario;
         return {
           ...s,
-          orderBuild,
-          orderCompletion,
-          tcAssurance,
-          billing
+          orderBuild: serialized.orderBuild,
+          orderCompletion: serialized.orderCompletion,
+          tcAssurance: serialized.tcAssurance,
+          billing: serialized.billing,
+          customValidations: serialized.customValidations
         };
       });
       setAgentLogs(prev => [...prev, `System: Validation points synced to all ${generatedScenarios.length} scenarios.`]);
     } else {
       updated = [...generatedScenarios];
-      updated[editingScenarioIndex] = editingScenarioData;
+      updated[editingScenarioIndex] = savedScenario;
     }
     
     setGeneratedScenarios(updated);
@@ -1005,13 +1107,52 @@ const App = () => {
     const count = generatedScenarios.length;
     if (!window.confirm(`Master Sync: This will apply these steps, outcomes, and settings to ALL ${count} journeys in your current draft. Unique titles will be preserved. Proceed?`)) return;
 
+    // Serialize validationPoints back to standard fields and customValidations
+    const serialized = (() => {
+      let orderBuild = null;
+      let orderCompletion = null;
+      let tcAssurance = null;
+      let billing = null;
+      const customValidations = [];
+
+      (editingScenarioData.validationPoints || []).forEach(vp => {
+        const labelLower = (vp.label || '').toLowerCase();
+        if (vp.id === 'orderBuild' || labelLower === 'order build' || labelLower === 'order build / pricing') {
+          orderBuild = vp.value || null;
+        } else if (vp.id === 'orderCompletion' || labelLower === 'status sync' || labelLower === 'completion' || labelLower === 'status sync / completion') {
+          orderCompletion = vp.value || null;
+        } else if (vp.id === 'tcAssurance' || labelLower === 't&c / comms' || labelLower === 't&c / comms assurance' || labelLower === 'tc assurance' || labelLower === 't&c assurance') {
+          tcAssurance = vp.value || null;
+        } else if (vp.id === 'billing' || labelLower === 'billing' || labelLower === 'billing expectations') {
+          billing = vp.value || null;
+        } else {
+          customValidations.push({
+            id: vp.id,
+            label: vp.label,
+            value: vp.value,
+            checked: vp.checked || false
+          });
+        }
+      });
+
+      return {
+        orderBuild,
+        orderCompletion,
+        tcAssurance,
+        billing,
+        customValidations: customValidations.length > 0 ? customValidations : null
+      };
+    })();
+
     const { summary, ...sharedData } = editingScenarioData;
+    delete sharedData.validationPoints;
     
     const updated = generatedScenarios.map((s, i) => {
-      if (i === editingScenarioIndex) return editingScenarioData;
+      if (i === editingScenarioIndex) return { ...editingScenarioData, ...serialized };
       return { 
         ...s, 
-        ...sharedData 
+        ...sharedData,
+        ...serialized
       };
     });
     
@@ -2025,27 +2166,48 @@ const App = () => {
                                 <p className={`text-xs leading-relaxed ${isDark ? 'text-emerald-400/80' : 'text-emerald-600'}`}>{s.expectedResult}</p>
                               </div>
 
-                              {/* New Validation Highlights Section */}
-                              <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/5' : 'border-slate-100'} space-y-3`}>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className={`p-2.5 rounded-xl ${isDark ? 'bg-primary/5' : 'bg-slate-50'} border ${isDark ? 'border-primary/10' : 'border-slate-100'}`}>
-                                    <span className={`text-[9px] font-black uppercase tracking-tighter ${subTextColor} block mb-1`}>Order Build</span>
-                                    <p className={`text-[10px] leading-tight font-bold ${textColor} truncate`}>{s.orderBuild || 'N/A'}</p>
+                              {/* Dynamic Validation Highlights Section */}
+                              {(() => {
+                                const validations = [];
+                                if (s.orderBuild) validations.push({ label: 'Order Build', value: s.orderBuild, bgClass: isDark ? 'bg-primary/5 border-primary/10' : 'bg-slate-50 border-slate-100', textClass: isDark ? 'text-primary' : 'text-primary', labelTextClass: isDark ? 'text-primary/70' : 'text-primary/80' });
+                                if (s.orderCompletion) validations.push({ label: 'Status Sync', value: s.orderCompletion, bgClass: isDark ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-emerald-50 border-emerald-100', textClass: isDark ? 'text-emerald-400' : 'text-emerald-700', labelTextClass: 'text-emerald-500/70' });
+                                if (s.tcAssurance) validations.push({ label: 'T&C / Comms', value: s.tcAssurance, bgClass: isDark ? 'bg-indigo-500/5 border-indigo-500/10' : 'bg-indigo-50 border-indigo-100', textClass: isDark ? 'text-indigo-400' : 'text-indigo-700', labelTextClass: 'text-indigo-500/70' });
+                                if (s.billing) validations.push({ label: 'Billing', value: s.billing, bgClass: isDark ? 'bg-amber-500/5 border-amber-500/10' : 'bg-amber-50 border-amber-100', textClass: isDark ? 'text-amber-400' : 'text-amber-700', labelTextClass: 'text-amber-500/70' });
+
+                                if (s.customValidations) {
+                                  try {
+                                    const customList = typeof s.customValidations === 'string' ? JSON.parse(s.customValidations) : s.customValidations;
+                                    if (Array.isArray(customList)) {
+                                      customList.forEach(cv => {
+                                        validations.push({
+                                          label: cv.label || 'Custom Check',
+                                          value: cv.value || '',
+                                          bgClass: isDark ? 'bg-purple-500/5 border-purple-500/10' : 'bg-purple-50 border-purple-100',
+                                          textClass: isDark ? 'text-purple-400' : 'text-purple-700',
+                                          labelTextClass: 'text-purple-500/70'
+                                        });
+                                      });
+                                    }
+                                  } catch (err) {
+                                    // Fallback
+                                  }
+                                }
+
+                                if (validations.length === 0) return null;
+
+                                return (
+                                  <div className={`mt-4 pt-4 border-t ${isDark ? 'border-white/5' : 'border-slate-100'} space-y-3`}>
+                                    <div className="grid grid-cols-2 gap-3">
+                                      {validations.map((v, vIdx) => (
+                                        <div key={vIdx} className={`p-2.5 rounded-xl border ${v.bgClass}`} title={`${v.label}: ${v.value}`}>
+                                          <span className={`text-[9px] font-black uppercase tracking-tighter ${v.labelTextClass} block mb-1 truncate`}>{v.label}</span>
+                                          <p className={`text-[10px] leading-tight font-bold ${v.textClass} truncate`}>{v.value || 'N/A'}</p>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
-                                  <div className={`p-2.5 rounded-xl ${isDark ? 'bg-emerald-500/5' : 'bg-emerald-50'} border ${isDark ? 'border-emerald-500/10' : 'border-emerald-100'}`}>
-                                    <span className={`text-[9px] font-black uppercase tracking-tighter text-emerald-500/70 block mb-1`}>Status Sync</span>
-                                    <p className={`text-[10px] leading-tight font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'} truncate`}>{s.orderCompletion || 'N/A'}</p>
-                                  </div>
-                                  <div className={`p-2.5 rounded-xl ${isDark ? 'bg-indigo-500/5' : 'bg-indigo-50'} border ${isDark ? 'border-indigo-500/10' : 'border-indigo-100'}`}>
-                                    <span className={`text-[9px] font-black uppercase tracking-tighter text-indigo-500/70 block mb-1`}>T&C / Comms</span>
-                                    <p className={`text-[10px] leading-tight font-bold ${isDark ? 'text-indigo-400' : 'text-indigo-700'} truncate`}>{s.tcAssurance || 'N/A'}</p>
-                                  </div>
-                                  <div className={`p-2.5 rounded-xl ${isDark ? 'bg-amber-500/5' : 'bg-amber-50'} border ${isDark ? 'border-amber-500/10' : 'border-amber-100'}`}>
-                                    <span className={`text-[9px] font-black uppercase tracking-tighter text-amber-500/70 block mb-1`}>Billing</span>
-                                    <p className={`text-[10px] leading-tight font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'} truncate`}>{s.billing || 'N/A'}</p>
-                                  </div>
-                                </div>
-                              </div>
+                                );
+                              })()}
                             </div>
                          </div>
                       </div>
@@ -2428,53 +2590,82 @@ const App = () => {
                 />
               </div>
 
-              {/* Validation Points Editing */}
+              {/* Dynamic Validation Points Editing */}
               <div className={`p-6 rounded-3xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'} border space-y-4`}>
-                <h4 className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor} flex items-center gap-2`}>
-                  <CheckCircle2 size={12} className="text-primary" />
-                  Validation Architecture
-                </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Order Build / Pricing</label>
-                    <input 
-                      type="text" 
-                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
-                      value={editingScenarioData.orderBuild || ''}
-                      onChange={(e) => setEditingScenarioData({...editingScenarioData, orderBuild: e.target.value})}
-                      placeholder="e.g. Validate Price: £59.99"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Status Sync / Completion</label>
-                    <input 
-                      type="text" 
-                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
-                      value={editingScenarioData.orderCompletion || ''}
-                      onChange={(e) => setEditingScenarioData({...editingScenarioData, orderCompletion: e.target.value})}
-                      placeholder="e.g. Order Status: CLOSED"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>T&C / Comms Assurance</label>
-                    <input 
-                      type="text" 
-                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
-                      value={editingScenarioData.tcAssurance || ''}
-                      onChange={(e) => setEditingScenarioData({...editingScenarioData, tcAssurance: e.target.value})}
-                      placeholder="e.g. Verify Welcome SMS"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>Billing Expectations</label>
-                    <input 
-                      type="text" 
-                      className={`w-full p-3 rounded-xl border ${isDark ? 'bg-slate-800 border-white/5 text-white' : 'bg-white border-slate-200 text-slate-900'} text-xs`}
-                      value={editingScenarioData.billing || ''}
-                      onChange={(e) => setEditingScenarioData({...editingScenarioData, billing: e.target.value})}
-                      placeholder="e.g. Part-month rental"
-                    />
-                  </div>
+                <div className="flex justify-between items-center">
+                  <h4 className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor} flex items-center gap-2`}>
+                    <CheckCircle2 size={12} className="text-primary" />
+                    Validation Architecture
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = editingScenarioData.validationPoints || [];
+                      setEditingScenarioData({
+                        ...editingScenarioData,
+                        validationPoints: [
+                          ...current,
+                          { id: `custom_${Date.now()}`, label: '', value: '', checked: false }
+                        ]
+                      });
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 bg-primary/10 text-primary text-[10px] font-bold uppercase rounded-lg hover:bg-primary/20 transition-all"
+                  >
+                    <Plus size={10} /> Add Point
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {(editingScenarioData.validationPoints || []).map((vp, vpIdx) => (
+                    <div key={vp.id || vpIdx} className={`p-4 rounded-2xl ${isDark ? 'bg-black/20 border-white/5' : 'bg-white border-slate-100'} border flex gap-3 items-end`}>
+                      <div className="flex-1 space-y-1.5 min-w-0">
+                        <label className={`text-[9px] font-black uppercase tracking-tighter ${subTextColor}`}>Label / Field</label>
+                        <input
+                          type="text"
+                          required
+                          className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} text-xs`}
+                          value={vp.label}
+                          placeholder="e.g. Order Build, Completion"
+                          onChange={(e) => {
+                            const updated = [...(editingScenarioData.validationPoints || [])];
+                            updated[vpIdx] = { ...vp, label: e.target.value };
+                            setEditingScenarioData({ ...editingScenarioData, validationPoints: updated });
+                          }}
+                        />
+                      </div>
+                      <div className="flex-[2] space-y-1.5 min-w-0">
+                        <label className={`text-[9px] font-black uppercase tracking-tighter ${subTextColor}`}>Expected Outcome / Description</label>
+                        <input
+                          type="text"
+                          required
+                          className={`w-full px-3 py-2 rounded-lg border ${isDark ? 'bg-slate-800 border-white/10 text-white' : 'bg-slate-50 border-slate-200 text-slate-900'} text-xs`}
+                          value={vp.value}
+                          placeholder="e.g. Price shows £59.99"
+                          onChange={(e) => {
+                            const updated = [...(editingScenarioData.validationPoints || [])];
+                            updated[vpIdx] = { ...vp, value: e.target.value };
+                            setEditingScenarioData({ ...editingScenarioData, validationPoints: updated });
+                          }}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = (editingScenarioData.validationPoints || []).filter(item => item.id !== vp.id);
+                          setEditingScenarioData({ ...editingScenarioData, validationPoints: updated });
+                        }}
+                        className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-lg transition-all shrink-0 h-9 flex items-center justify-center animate-in fade-in duration-200"
+                        title="Remove Validation Point"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                  {(editingScenarioData.validationPoints || []).length === 0 && (
+                    <div className={`text-center py-6 border-2 border-dashed ${isDark ? 'border-white/5' : 'border-slate-200'} rounded-2xl`}>
+                      <p className={`text-xs ${subTextColor} italic`}>No validation checkpoints defined. Add one above.</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="pt-4 flex flex-col sm:flex-row gap-4">
@@ -2556,32 +2747,71 @@ const App = () => {
                           <p className="text-[10px] text-slate-500 truncate uppercase tracking-widest mb-4">
                             Priority: {tc.priority}
                           </p>
-
                           <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-slate-900/50 rounded-xl border border-slate-800">
-                            {[
-                              { field: 'checkUi', label: 'UI Valid' },
-                              { field: 'checkOrderBuild', label: 'Order Build' },
-                              { field: 'checkOrderCompletion', label: 'Completion' },
-                              { field: 'checkPcsMcpr', label: 'PCS & MCPR' }
-                            ].map(val => (
-                              <button
-                                key={val.field}
-                                onClick={() => updateCaseValidation(tc.id, val.field, !tc[val.field])}
-                                className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all text-left ${
-                                  tc[val.field] 
-                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                                  : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:border-slate-600'
-                                }`}
-                              >
-                                <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
-                                  tc[val.field] ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-600'
-                                }`}>
-                                  {tc[val.field] && <CheckCircle2 size={10} className="text-white" />}
-                                </div>
-                                <span className="text-[9px] font-black uppercase tracking-tighter">{val.label}</span>
-                              </button>
-                            ))}
-                          </div>
+                             {(() => {
+                               const checklist = [];
+                               checklist.push({ isCustom: false, field: 'checkUi', label: 'UI Valid', checked: !!tc.checkUi, description: 'Verify UI components' });
+                               if (tc.orderBuild) checklist.push({ isCustom: false, field: 'checkOrderBuild', label: 'Order Build', checked: !!tc.checkOrderBuild, description: tc.orderBuild });
+                               if (tc.orderCompletion) checklist.push({ isCustom: false, field: 'checkOrderCompletion', label: 'Completion', checked: !!tc.checkOrderCompletion, description: tc.orderCompletion });
+                               if (tc.tcAssurance) checklist.push({ isCustom: false, field: 'checkPcsMcpr', label: 'T&C / Comms', checked: !!tc.checkPcsMcpr, description: tc.tcAssurance });
+                               if (tc.billing) {
+                                 // Render billing as custom item if not already in customValidations to maintain consistency
+                                 checklist.push({ isCustom: true, id: 'billing_check', label: 'Billing', checked: tc.customValidations?.includes('"id":"billing_check","checked":true') || false, description: tc.billing });
+                               }
+
+                               if (tc.customValidations) {
+                                 try {
+                                   const customList = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+                                   if (Array.isArray(customList)) {
+                                     customList.forEach(cv => {
+                                       if (cv.id !== 'billing_check') {
+                                         checklist.push({
+                                           isCustom: true,
+                                           id: cv.id,
+                                           label: cv.label || 'Custom Check',
+                                           checked: !!cv.checked,
+                                           description: cv.value || ''
+                                         });
+                                       }
+                                     });
+                                   }
+                                 } catch (err) {
+                                   // Skip
+                                 }
+                               }
+
+                               return checklist.map((val, valIdx) => (
+                                 <button
+                                   key={val.field || val.id || valIdx}
+                                   onClick={() => {
+                                     if (val.isCustom) {
+                                       updateCaseCustomValidation(tc.id, val.id, !val.checked);
+                                     } else {
+                                       updateCaseValidation(tc.id, val.field, !val.checked);
+                                     }
+                                   }}
+                                   className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all text-left group/btn relative ${
+                                     val.checked 
+                                     ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+                                     : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:border-slate-600'
+                                   }`}
+                                   title={`${val.label}: ${val.description || 'No details'}`}
+                                 >
+                                   <div className={`w-3.5 h-3.5 rounded flex items-center justify-center border transition-all ${
+                                     val.checked ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-600'
+                                   }`}>
+                                     {val.checked && <CheckCircle2 size={10} className="text-white" />}
+                                   </div>
+                                   <div className="min-w-0">
+                                     <span className="text-[9px] font-black uppercase tracking-tighter block truncate">{val.label}</span>
+                                     {val.description && (
+                                       <span className="text-[7px] font-bold block truncate opacity-60 max-w-[100px]">{val.description}</span>
+                                     )}
+                                   </div>
+                                 </button>
+                               ));
+                             })()}
+                           </div>
                         </div>
 
                         <div className="flex flex-wrap items-center gap-4">

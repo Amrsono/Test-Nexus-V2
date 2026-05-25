@@ -75,24 +75,23 @@ const generateScenarios = async (requirements, onProgress, options = {}) => {
            - expectedResult: Specific expected outcome for that context.
            - priority: ${options.priority || 'MEDIUM'}.
            - module: A functional area name.
-           - orderBuild: Key data to validate during capture (e.g. "Validate Price: £59.99, MCPR: Included").
-           - orderCompletion: Success criteria for provisioning (e.g. "Sim active, Order status: CLOSED").
-           - tcAssurance: Specific T&Cs or Comms to verify (e.g. "Verify Welcome SMS sent, T&Cs accepted").
-           - billing: First bill expectations (e.g. "Validate Part-month rental + Advance payment").
+           - validationPoints: Array of objects with 'name' and 'value'. Include 4 standard points by default: "Order Build", "Status Sync", "T&C / Comms", "Billing". Example: [{"name": "Order Build", "value": "Validate Price"}, {"name": "Status Sync", "value": "Order status: Complete"}, {"name": "T&C / Comms", "value": "N/A"}, {"name": "Billing", "value": "N/A"}]
 
         Format the entire response as a clean JSON array of objects.
         Example output format:
         [
           {
             "summary": "User can login with valid credentials",
-            "steps": "1. Go to login page\n2. Enter valid email\n3. Enter valid password\n4. Click Login",
+            "steps": "1. Go to login page\\n2. Enter valid email\\n3. Enter valid password\\n4. Click Login",
             "expectedResult": "User is redirected to dashboard",
             "priority": "HIGH",
             "module": "Authentication",
-            "orderBuild": "N/A",
-            "orderCompletion": "Order status: Complete",
-            "tcAssurance": "N/A",
-            "billing": "N/A"
+            "validationPoints": [
+              { "name": "Order Build", "value": "N/A" },
+              { "name": "Status Sync", "value": "Order status: Complete" },
+              { "name": "T&C / Comms", "value": "N/A" },
+              { "name": "Billing", "value": "N/A" }
+            ]
           }
         ]
 

@@ -60,6 +60,16 @@ router.post('/', upload.single('file'), async (req, res) => {
       }
     }
 
+    // Dynamic header discovery for validation columns
+    const findHeader = (patterns) => {
+      return headers.find(h => patterns.some(p => h.toLowerCase().includes(p.toLowerCase())));
+    };
+
+    const orderBuildHeader = findHeader(['order build', 'orderbuild', 'prices', 'mcpr', 'prices, mcpr']);
+    const orderCompletionHeader = findHeader(['order completion', 'ordercompletion', 'completion', 'status sync', 'statussync']);
+    const tcAssuranceHeader = findHeader(['t&c', 'tc assurance', 'tcassurance', 'comms', 'comms assurance', 'assurance']);
+    const billingHeader = findHeader(['billing']);
+
     // SCALABLE EXTRACTION: Map raw rows to structured TestCases using AI's mapping
     const structuredCases = allRawData.map(row => {
       const extId = row[fieldMapping.externalId]?.toString() || '';
@@ -78,13 +88,48 @@ router.post('/', upload.single('file'), async (req, res) => {
         stepsValue = stepsValue.toString();
       }
 
+      // Gather standard validations
+      const orderBuild = orderBuildHeader ? row[orderBuildHeader]?.toString() || null : null;
+      const orderCompletion = orderCompletionHeader ? row[orderCompletionHeader]?.toString() || null : null;
+      const tcAssurance = tcAssuranceHeader ? row[tcAssuranceHeader]?.toString() || null : null;
+      const billing = billingHeader ? row[billingHeader]?.toString() || null : null;
+
+      // Also support building a customValidations JSON array from any other validation columns if they are not standard
+      const customValList = [];
+      // If there are other columns containing 'validation' or 'check' or 'verify' that aren't the standard ones, we can import them
+      headers.forEach(h => {
+        const lowerH = h.toLowerCase();
+        if (
+          (lowerH.includes('validation') || lowerH.includes('checkpoint') || lowerH.includes('verify')) &&
+          h !== orderBuildHeader &&
+          h !== orderCompletionHeader &&
+          h !== tcAssuranceHeader &&
+          h !== billingHeader
+        ) {
+          const val = row[h]?.toString();
+          if (val) {
+            customValList.push({
+              id: `sheet_${h.replace(/\s+/g, '_')}`,
+              label: h,
+              value: val,
+              checked: false
+            });
+          }
+        }
+      });
+
       return {
         externalId: extId,
         summary: combinedSummary,
         steps: stepsValue,
         expectedResult: row[fieldMapping.expectedResult]?.toString() || 'No Expected Result',
         priority: (row[fieldMapping.priority]?.toString().toUpperCase() || 'MEDIUM'),
-        module: row[fieldMapping.module]?.toString() || row._sheetName || 'Default'
+        module: row[fieldMapping.module]?.toString() || row._sheetName || 'Default',
+        orderBuild,
+        orderCompletion,
+        tcAssurance,
+        billing,
+        customValidations: customValList.length > 0 ? JSON.stringify(customValList) : null
       };
     }).filter(c => c !== null);
 

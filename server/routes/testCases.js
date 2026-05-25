@@ -46,7 +46,7 @@ router.patch('/:id/status', async (req, res) => {
 // Update manual validation checkpoints
 router.patch('/:id/validations', async (req, res) => {
   const { id } = req.params;
-  const { checkUi, checkOrderBuild, checkOrderCompletion, checkPcsMcpr } = req.body;
+  const { checkUi, checkOrderBuild, checkOrderCompletion, checkPcsMcpr, customValidations } = req.body;
   
   try {
     const updated = await prisma.testCase.update({
@@ -55,7 +55,10 @@ router.patch('/:id/validations', async (req, res) => {
         ...(checkUi !== undefined && { checkUi }),
         ...(checkOrderBuild !== undefined && { checkOrderBuild }),
         ...(checkOrderCompletion !== undefined && { checkOrderCompletion }),
-        ...(checkPcsMcpr !== undefined && { checkPcsMcpr })
+        ...(checkPcsMcpr !== undefined && { checkPcsMcpr }),
+        ...(customValidations !== undefined && { 
+          customValidations: typeof customValidations === 'string' ? customValidations : JSON.stringify(customValidations) 
+        })
       }
     });
     res.json(updated);
