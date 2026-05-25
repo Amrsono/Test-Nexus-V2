@@ -278,21 +278,21 @@ router.get('/project/:id/ppt', async (req, res) => {
     s7.addShape(pres.ShapeType.rect, { x: 0.5, y: 0.8, w: 2, h: 0.05, fill: { color: "6366F1" } });
     
     if (project.insights.length > 0) {
-      project.insights.forEach((insight, idx) => {
-        const yPos = 1.1 + (idx * 0.9); // Increased gap to 0.9
+      project.insights.slice(0, 4).forEach((insight, idx) => {
+        const yPos = 1.1 + (idx * 1.1); // Increased gap to 1.1
         const color = insight.type === 'RISK' ? 'EF4444' : insight.type === 'VELOCITY' ? 'F59E0B' : '6366F1';
         
         // Visual indicator bar
-        s7.addShape(pres.ShapeType.rect, { x: 0.5, y: yPos, w: 0.06, h: 0.8, fill: { color: color } });
+        s7.addShape(pres.ShapeType.rect, { x: 0.5, y: yPos, w: 0.06, h: 1.0, fill: { color: color } });
         
         // Category Label
         s7.addText(insight.type.toUpperCase(), { 
-          x: 0.7, y: yPos, w: 8.8, h: 0.2, fontSize: 8, bold: true, color: color, fontFace: "Arial", charSpacing: 1, margin: 0 
+          x: 0.7, y: yPos, w: 8.8, h: 0.2, fontSize: 10, bold: true, color: color, fontFace: "Arial", charSpacing: 1, margin: 0 
         });
         
         // The actual insight message
         s7.addText(insight.message, { 
-          x: 0.7, y: yPos + 0.25, w: 8.8, h: 0.65, fontSize: 11, color: "FFFFFF", fontFace: "Arial", valign: 'top', margin: 0 
+          x: 0.7, y: yPos + 0.2, w: 8.8, h: 0.8, fontSize: 10, color: "FFFFFF", fontFace: "Arial", valign: 'top', margin: 0 
         });
       });
     } else {
