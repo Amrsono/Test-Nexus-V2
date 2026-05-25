@@ -200,6 +200,7 @@ router.post('/bulk', async (req, res) => {
           orderCompletion: tc.orderCompletion || null,
           tcAssurance: tc.tcAssurance || null,
           billing: tc.billing || null,
+          customValidations: tc.customValidations ? JSON.stringify(tc.customValidations) : null,
           checkUi: false,
           checkOrderBuild: false,
           checkOrderCompletion: false,

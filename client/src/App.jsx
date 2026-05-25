@@ -156,7 +156,26 @@ const App = () => {
       setAgentLogs(prev => [...prev.slice(-4), data.message]); // Keep last 5 logs
     });
 
-    return () => socket.off('agent:status');
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          // Token expired or invalid
+          setUser(null);
+          setProjects([]);
+          setSelectedProjectId(null);
+          localStorage.removeItem('nexus_user');
+          localStorage.removeItem('nexus_token');
+          delete axios.defaults.headers.common['Authorization'];
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      socket.off('agent:status');
+      axios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
   const handleLogin = (data) => {
@@ -504,56 +523,13 @@ const App = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('suiteName', 'Import ' + new Date().toLocaleDateString());
-    formData.append('projectId', selectedProjectId);
+    // Reset input so the same file can be selected again if cancelled
+    e.target.value = '';
 
-    try {
-      setLoading(true);
-      setAgentLogs(['System: Initiating secure upload...']);
-      const res = await axios.post(`${API_BASE}/upload`, formData);
-      
-      if (res.status === 202 && res.data.status === 'MAPPING_REQUIRED') {
-        setActiveHeaders(res.data.headers);
-        setActiveUploadFile(file);
-        // Pre-fill project name from filename (strip extension)
-        const nameFromFile = file.name ? file.name.replace(/\.[^.]+$/, '') : 'New Project';
-        setManualProjectName(nameFromFile);
-        setActiveFilename(file.name);
-        setIsMappingModalOpen(true);
-        setAgentLogs(prev => [...prev, 'System: Switching to Manual Mapping...']);
-        return;
-      }
-
-      const newProjectId = res.data.projectId;
-      
-      // Refresh projects and switch if a new one was discovered
-      await fetchProjects();
-      setSelectedProjectId(newProjectId);
-      
-      // Explicitly refresh data for the new/current project using the ID directly to avoid state race conditions
-      await fetchStats(newProjectId);
-      await fetchUnassigned(newProjectId);
-      await fetchAllTestCases(newProjectId);
-      await handleAnalyze();
-      
-      // Populate pending states and open the Import Destination Modal
-      setPendingImportScenarios(res.data.structuredCases || []);
-      setPendingImportProjectId(newProjectId);
-      setImportLabTargetProjectId(newProjectId);
-      setImportDestination('workload');
-      setIsImportDestinationModalOpen(true);
-      
-      if (res.data.discoveredProject) {
-        setAgentLogs(prev => [...prev, `System: Project Discovered - ${res.data.discoveredProject}`]);
-      }
-    } catch (err) {
-      console.error('Upload failed', err);
-      alert('Failed to import test plan');
-    } finally {
-      setLoading(false);
-    }
+    setActiveUploadFile(file);
+    setImportDestination('workload');
+    setImportLabTargetProjectId('');
+    setIsImportDestinationModalOpen(true);
   };
 
   const handleManualSubmit = async (e) => {
@@ -563,9 +539,10 @@ const App = () => {
     const formData = new FormData();
     formData.append('file', activeUploadFile);
     formData.append('suiteName', 'Manual Import ' + new Date().toLocaleDateString());
-    formData.append('projectId', selectedProjectId);
+    formData.append('projectId', importLabTargetProjectId || selectedProjectId);
     formData.append('manualMapping', JSON.stringify(manualMap));
     formData.append('manualProjectName', manualProjectName);
+    formData.append('destination', importDestination);
 
     try {
       setLoading(true);
@@ -577,19 +554,23 @@ const App = () => {
 
       await fetchProjects();
       setSelectedProjectId(newProjectId);
-      await fetchStats(newProjectId);
-      await fetchUnassigned(newProjectId);
-      await fetchAllTestCases(newProjectId);
-      await handleAnalyze();
       
-      setAgentLogs(prev => [...prev, 'System: Manual Import Successful.']);
+      if (importDestination === 'lab') {
+        setGeneratedScenarios(res.data.structuredCases || []);
+        setCurrentView('lab');
+        setAgentLogs(prev => [...prev, `System: ${res.data.count} scenarios loaded into Scenario Lab.`]);
+        alert(`${res.data.count} scenarios loaded into Scenario Lab for drafts editing!`);
+      } else {
+        await fetchStats(newProjectId);
+        await fetchUnassigned(newProjectId);
+        await fetchAllTestCases(newProjectId);
+        await handleAnalyze();
+        setAgentLogs(prev => [...prev, 'System: Manual Import Successful.']);
+        alert(`${res.data.count} scenarios imported to workload successfully!`);
+      }
       
-      // Populate pending states and open the Import Destination Modal
-      setPendingImportScenarios(res.data.structuredCases || []);
-      setPendingImportProjectId(newProjectId);
-      setImportLabTargetProjectId(newProjectId);
-      setImportDestination('workload');
-      setIsImportDestinationModalOpen(true);
+      setActiveUploadFile(null);
+      setImportLabTargetProjectId('');
     } catch (err) {
       console.error('Manual upload failed', err);
       alert('Failed to import test plan manually');
@@ -624,31 +605,62 @@ const App = () => {
     }
   };
 
-  const handleImportDestinationConfirm = () => {
+  const handleImportDestinationConfirm = async () => {
     setIsImportDestinationModalOpen(false);
+    
+    if (!activeUploadFile) return;
 
-    const targetProjectId = importLabTargetProjectId || pendingImportProjectId;
+    const formData = new FormData();
+    formData.append('file', activeUploadFile);
+    formData.append('suiteName', 'Import ' + new Date().toLocaleDateString());
+    formData.append('projectId', importLabTargetProjectId || selectedProjectId);
+    formData.append('destination', importDestination);
 
-    if (importDestination === 'both') {
-      if (targetProjectId) {
-        setSelectedProjectId(targetProjectId);
+    try {
+      setLoading(true);
+      setAgentLogs(['System: Initiating secure upload...']);
+      const res = await axios.post(`${API_BASE}/upload`, formData);
+      
+      if (res.status === 202 && res.data.status === 'MAPPING_REQUIRED') {
+        setActiveHeaders(res.data.headers);
+        const nameFromFile = activeUploadFile.name ? activeUploadFile.name.replace(/\.[^.]+$/, '') : 'New Project';
+        setManualProjectName(nameFromFile);
+        setActiveFilename(activeUploadFile.name);
+        setIsMappingModalOpen(true);
+        setAgentLogs(prev => [...prev, 'System: Switching to Manual Mapping...']);
+        return;
       }
-      setGeneratedScenarios(pendingImportScenarios);
-      setCurrentView('lab');
-      setAgentLogs(prev => [...prev, `System: ${pendingImportScenarios.length} scenarios loaded into Scenario Lab for editing.`]);
-      alert(`${pendingImportScenarios.length} scenarios imported to workload AND loaded into Scenario Lab!`);
-    } else {
-      if (targetProjectId) {
-        setSelectedProjectId(targetProjectId);
+
+      const newProjectId = res.data.projectId;
+      
+      await fetchProjects();
+      setSelectedProjectId(newProjectId);
+      
+      if (importDestination === 'lab') {
+        setGeneratedScenarios(res.data.structuredCases || []);
+        setCurrentView('lab');
+        setAgentLogs(prev => [...prev, `System: ${res.data.count} scenarios loaded into Scenario Lab for editing.`]);
+        alert(`${res.data.count} scenarios loaded into Scenario Lab for drafts editing!`);
+      } else {
+        await fetchStats(newProjectId);
+        await fetchUnassigned(newProjectId);
+        await fetchAllTestCases(newProjectId);
+        await handleAnalyze();
+        alert(`${res.data.count} scenarios imported to workload successfully!`);
       }
-      alert(`${pendingImportScenarios.length} scenarios imported to workload successfully!`);
+      
+      if (res.data.discoveredProject) {
+        setAgentLogs(prev => [...prev, `System: Project Discovered - ${res.data.discoveredProject}`]);
+      }
+
+      setActiveUploadFile(null);
+      setImportLabTargetProjectId('');
+    } catch (err) {
+      console.error('Upload failed', err);
+      alert('Failed to import test plan');
+    } finally {
+      setLoading(false);
     }
-
-    // Cleanup
-    setPendingImportScenarios([]);
-    setPendingImportProjectId(null);
-    setImportDestination('workload');
-    setImportLabTargetProjectId('');
   };
 
   const handleBackgroundUpload = async (e) => {
@@ -2281,17 +2293,17 @@ const App = () => {
                       className="accent-indigo-500 w-4 h-4"
                     />
                     <div>
-                      <p className="font-medium text-sm">Import to Workload Only</p>
+                      <p className="font-medium text-sm">Import directly to Workload</p>
                       <p className="text-xs text-slate-400 mt-1">Saves scenarios directly to the database workload.</p>
                     </div>
                   </div>
                 </div>
 
-                {/* Option 2: Workload + Scenario Lab */}
+                {/* Option 2: Scenario Lab */}
                 <div 
-                  onClick={() => setImportDestination('both')}
+                  onClick={() => setImportDestination('lab')}
                   className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    importDestination === 'both' 
+                    importDestination === 'lab' 
                       ? 'bg-indigo-600/25 border-indigo-500 text-white' 
                       : 'bg-slate-800/40 border-slate-700 hover:border-slate-600 text-slate-300'
                   }`}
@@ -2300,38 +2312,36 @@ const App = () => {
                     <input 
                       type="radio" 
                       name="importDestination" 
-                      value="both" 
-                      checked={importDestination === 'both'} 
-                      onChange={() => setImportDestination('both')}
+                      value="lab" 
+                      checked={importDestination === 'lab'} 
+                      onChange={() => setImportDestination('lab')}
                       className="accent-indigo-500 w-4 h-4"
                     />
                     <div>
-                      <p className="font-medium text-sm">Import to Workload & Scenario Lab</p>
-                      <p className="text-xs text-slate-400 mt-1">Saves to DB and loads into Scenario Lab for drafts editing.</p>
+                      <p className="font-medium text-sm">Import to Scenario Lab for Editing</p>
+                      <p className="text-xs text-slate-400 mt-1">Parses scenarios and loads them into the Scenario Lab as drafts.</p>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Project selector */}
-              {importDestination === 'both' && (
-                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-                  <label className="text-xs font-semibold text-slate-400 flex items-center gap-2">
-                    <Activity className="w-4 h-4 text-indigo-400" /> Target Scenario Lab Project
-                  </label>
-                  <select
-                    value={importLabTargetProjectId}
-                    onChange={(e) => setImportLabTargetProjectId(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-                  >
-                    <option value="">Select Project...</option>
-                    {projects.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                  <p className="text-[10px] text-slate-500">Draft scenarios will be bound to this project tab in Scenario Lab.</p>
-                </div>
-              )}
+              <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                <label className="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-indigo-400" /> Target Project Scope
+                </label>
+                <select
+                  value={importLabTargetProjectId}
+                  onChange={(e) => setImportLabTargetProjectId(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="">Auto-Detect / Active Project</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-500">Scenarios will be bound to this project, or the AI will auto-detect the scope.</p>
+              </div>
             </div>
 
             <div className="p-6 bg-slate-900/50 border-t border-slate-800 flex justify-end gap-3">
@@ -2339,8 +2349,7 @@ const App = () => {
                 type="button"
                 onClick={() => {
                   setIsImportDestinationModalOpen(false);
-                  setPendingImportScenarios([]);
-                  setPendingImportProjectId(null);
+                  setActiveUploadFile(null);
                   setImportLabTargetProjectId('');
                 }}
                 className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
@@ -2349,8 +2358,7 @@ const App = () => {
               </button>
               <button
                 onClick={handleImportDestinationConfirm}
-                disabled={importDestination === 'both' && !importLabTargetProjectId}
-                className="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 transition-all"
               >
                 Confirm
               </button>

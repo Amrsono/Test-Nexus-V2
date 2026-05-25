@@ -143,27 +143,30 @@ router.post('/', upload.single('file'), async (req, res) => {
       }
     }
 
-    emitStatus(`System: Saving ${structuredCases.length} test cases to suite...`);
-
-    // Create Suite
-    const suite = await prisma.testSuite.create({
-      data: {
-        name: suiteName || `Import ${new Date().toLocaleDateString()}`,
-        projectId: targetProjectId,
-        testCases: {
-          create: structuredCases
-        }
-      },
-      include: { testCases: true }
-    });
-
-    emitStatus('Agent: Import Successful.');
+    let suite = null;
+    if (req.body.destination === 'lab') {
+      emitStatus('Agent: Drafts loaded into Scenario Lab.');
+    } else {
+      emitStatus(`System: Saving ${structuredCases.length} test cases to suite...`);
+      // Create Suite
+      suite = await prisma.testSuite.create({
+        data: {
+          name: suiteName || `Import ${new Date().toLocaleDateString()}`,
+          projectId: targetProjectId,
+          testCases: {
+            create: structuredCases
+          }
+        },
+        include: { testCases: true }
+      });
+      emitStatus('Agent: Import Successful.');
+    }
 
     res.json({
-      message: 'Import successful',
-      suiteId: suite.id,
+      message: req.body.destination === 'lab' ? 'Loaded to Lab' : 'Import successful',
+      suiteId: suite ? suite.id : null,
       projectId: targetProjectId,
-      count: suite.testCases.length,
+      count: suite ? suite.testCases.length : structuredCases.length,
       discoveredProject: aiProject?.name,
       structuredCases: structuredCases
     });
