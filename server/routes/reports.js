@@ -261,10 +261,10 @@ router.get('/project/:id/ppt', async (req, res) => {
     
     if (pmInsights.length > 0) {
       pmInsights.forEach((insight, idx) => {
-        const yOffset = 3.5 + (idx * 0.6); // Reduced gap to 0.6 and started at 3.5
-        s6.addShape(pres.ShapeType.ellipse, { x: 0.5, y: yOffset + 0.1, w: 0.06, h: 0.06, fill: { color: "6366F1" } });
+        const yOffset = 3.5 + (idx * 0.7); // Increased gap to prevent overlap
+        s6.addShape(pres.ShapeType.ellipse, { x: 0.5, y: yOffset + 0.05, w: 0.06, h: 0.06, fill: { color: "6366F1" } });
         s6.addText(insight.message, { 
-          x: 0.7, y: yOffset, w: 8.5, h: 0.5, fontSize: 10, color: "FFFFFF", fontFace: "Arial", valign: 'top' 
+          x: 0.7, y: yOffset, w: 8.5, h: 0.65, fontSize: 10, color: "FFFFFF", fontFace: "Arial", valign: 'top', margin: 0 
         });
       });
     } else {
@@ -279,20 +279,20 @@ router.get('/project/:id/ppt', async (req, res) => {
     
     if (project.insights.length > 0) {
       project.insights.forEach((insight, idx) => {
-        const yPos = 1.1 + (idx * 0.85); // Reduced gap to 0.85 to fit up to 5 items on 5.625" height
+        const yPos = 1.1 + (idx * 0.9); // Increased gap to 0.9
         const color = insight.type === 'RISK' ? 'EF4444' : insight.type === 'VELOCITY' ? 'F59E0B' : '6366F1';
         
         // Visual indicator bar
-        s7.addShape(pres.ShapeType.rect, { x: 0.5, y: yPos, w: 0.06, h: 0.6, fill: { color: color } });
+        s7.addShape(pres.ShapeType.rect, { x: 0.5, y: yPos, w: 0.06, h: 0.8, fill: { color: color } });
         
         // Category Label
         s7.addText(insight.type.toUpperCase(), { 
-          x: 0.7, y: yPos, fontSize: 8, bold: true, color: color, fontFace: "Arial", charSpacing: 1 
+          x: 0.7, y: yPos, w: 8.8, h: 0.2, fontSize: 8, bold: true, color: color, fontFace: "Arial", charSpacing: 1, margin: 0 
         });
         
         // The actual insight message
         s7.addText(insight.message, { 
-          x: 0.7, y: yPos + 0.2, w: 8.8, h: 0.6, fontSize: 11, color: "FFFFFF", fontFace: "Arial", valign: 'top' 
+          x: 0.7, y: yPos + 0.25, w: 8.8, h: 0.65, fontSize: 11, color: "FFFFFF", fontFace: "Arial", valign: 'top', margin: 0 
         });
       });
     } else {
@@ -380,14 +380,14 @@ router.get('/project/:id/ppt', async (req, res) => {
     const topBlocker = sortedStats[0][1];
     const secondBlocker = sortedStats[1][1];
 
-    s8.addText(`1. ${topBlocker.label} (${topBlocker.failed} open)`, { x: 5.5, y: 2.9, w: 4, fontSize: 12, color: "EF4444", bold: true, fontFace: "Arial" });
-    s8.addText(`   Highest volume of unverified points. Direct threat to UAT sign-off.`, { x: 5.5, y: 3.1, w: 4, fontSize: 10, color: "94A3B8", fontFace: "Arial" });
+    s8.addText(`1. ${topBlocker.label} (${topBlocker.failed} open)`, { x: 5.5, y: 2.7, w: 4, h: 0.25, fontSize: 12, color: "EF4444", bold: true, fontFace: "Arial", margin: 0 });
+    s8.addText(`   Highest volume of unverified points. Direct threat to UAT sign-off.`, { x: 5.5, y: 2.95, w: 4, h: 0.4, fontSize: 10, color: "94A3B8", fontFace: "Arial", valign: "top", margin: 0 });
 
-    s8.addText(`2. ${secondBlocker.label} (${secondBlocker.failed} open)`, { x: 5.5, y: 3.5, w: 4, fontSize: 12, color: "F59E0B", bold: true, fontFace: "Arial" });
-    s8.addText(`   Second major friction point. Requires dedicated validation resources.`, { x: 5.5, y: 3.7, w: 4, fontSize: 10, color: "94A3B8", fontFace: "Arial" });
+    s8.addText(`2. ${secondBlocker.label} (${secondBlocker.failed} open)`, { x: 5.5, y: 3.4, w: 4, h: 0.25, fontSize: 12, color: "F59E0B", bold: true, fontFace: "Arial", margin: 0 });
+    s8.addText(`   Second major friction point. Requires dedicated validation resources.`, { x: 5.5, y: 3.65, w: 4, h: 0.4, fontSize: 10, color: "94A3B8", fontFace: "Arial", valign: "top", margin: 0 });
 
     s8.addText(`Recommendation: Shift testing capacity to target ${topBlocker.label} to restore timeline trajectory and mitigate schedule slippage.`, { 
-      x: 5.5, y: 4.2, w: 4, h: 0.8, fontSize: 11, color: "10B981", fontFace: "Arial", italic: true, valign: "top" 
+      x: 5.5, y: 4.1, w: 4, h: 0.8, fontSize: 11, color: "10B981", fontFace: "Arial", italic: true, valign: "top", margin: 0 
     });
 
     console.log("Generating buffer...");

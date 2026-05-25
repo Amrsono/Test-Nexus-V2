@@ -69,6 +69,8 @@ const App = () => {
   const [activeUploadFile, setActiveUploadFile] = useState(null);
   const [activeFilename, setActiveFilename] = useState('');
   const [isTrackerOpen, setIsTrackerOpen] = useState(false);
+  const [trackerFilterStatus, setTrackerFilterStatus] = useState('ALL');
+  const [trackerFilterTester, setTrackerFilterTester] = useState('ALL');
   const [allTestCases, setAllTestCases] = useState([]);
   const [manualProjectName, setManualProjectName] = useState('');
   const [manualMap, setManualMap] = useState({
@@ -99,6 +101,7 @@ const App = () => {
     description: '', futImpact: '', relatedCaseId: '', blockedCases: '',
     raisedAt: new Date().toISOString().split('T')[0]
   });
+  const [defectFilter, setDefectFilter] = useState('ALL');
 
   const [localTheme, setLocalTheme] = useState(() => localStorage.getItem('nexus_theme') || '#f8fafc');
 
@@ -1669,6 +1672,17 @@ const App = () => {
                     <h4 className={`font-bold ${textColor} flex items-center gap-2`}>
                       <Bug size={20} className={subTextColor} />
                       Major Blockers
+                      <select 
+                        value={defectFilter}
+                        onChange={(e) => setDefectFilter(e.target.value)}
+                        className={`text-[10px] font-bold px-2 py-1 rounded-lg border ${isDark ? 'bg-slate-900 border-white/20 text-white' : 'bg-white border-slate-200 text-slate-900'} outline-none ml-2 cursor-pointer`}
+                      >
+                        <option value="ALL">All</option>
+                        <option value="P1">P1</option>
+                        <option value="P2">P2</option>
+                        <option value="P3">P3</option>
+                        <option value="P4">P4</option>
+                      </select>
                     </h4>
                     <button 
                       onClick={() => {
@@ -1687,8 +1701,8 @@ const App = () => {
                     </button>
                   </div>
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
-                    {defects.length > 0 ? (
-                      defects.map(defect => (
+                    {defects.filter(d => defectFilter === 'ALL' || d.severity === defectFilter).length > 0 ? (
+                      defects.filter(d => defectFilter === 'ALL' || d.severity === defectFilter).map(defect => (
                         <div 
                           key={defect.id} 
                           onClick={() => handleOpenEditDefect(defect)}
@@ -2749,12 +2763,48 @@ const App = () => {
               </div>
             </div>
 
+            {/* Filters */}
+            <div className="px-8 py-4 border-b border-slate-800 bg-slate-900/80 flex gap-4">
+              <select 
+                value={trackerFilterStatus}
+                onChange={e => setTrackerFilterStatus(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm outline-none focus:border-indigo-500"
+              >
+                <option value="ALL">All Statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="PASS">Passed</option>
+                <option value="FAIL">Failed</option>
+                <option value="BLOCKED">Blocked</option>
+              </select>
+              
+              <select 
+                value={trackerFilterTester}
+                onChange={e => setTrackerFilterTester(e.target.value)}
+                className="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-white text-sm outline-none focus:border-indigo-500"
+              >
+                <option value="ALL">All Testers</option>
+                {Array.from(new Set(allTestCases.map(tc => tc.assignments?.[0]?.tester?.name).filter(Boolean))).map(testerName => (
+                  <option key={testerName} value={testerName}>{testerName}</option>
+                ))}
+                <option value="UNASSIGNED">Unassigned</option>
+              </select>
+            </div>
+
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
               <div className="grid grid-cols-1 gap-4">
-                {allTestCases.length > 0 ? (
-                  allTestCases.map(tc => {
-                    const assignee = tc.assignments?.[0]?.tester;
+                {(() => {
+                  const filteredCases = allTestCases.filter(tc => {
+                    if (trackerFilterStatus !== 'ALL' && tc.status !== trackerFilterStatus) return false;
+                    const testerName = tc.assignments?.[0]?.tester?.name;
+                    if (trackerFilterTester === 'UNASSIGNED' && testerName) return false;
+                    if (trackerFilterTester !== 'ALL' && trackerFilterTester !== 'UNASSIGNED' && testerName !== trackerFilterTester) return false;
+                    return true;
+                  });
+
+                  return filteredCases.length > 0 ? (
+                    filteredCases.map(tc => {
+                      const assignee = tc.assignments?.[0]?.tester;
                     return (
                       <div 
                         key={tc.id} 
@@ -2882,8 +2932,9 @@ const App = () => {
                     );
                   })
                 ) : (
-                  <div className="p-20 text-center text-slate-500 italic">No scenarios found for this project.</div>
-                )}
+                  <div className="p-20 text-center text-slate-500 italic">No scenarios found matching the current filters.</div>
+                );
+                })()}
               </div>
             </div>
 
