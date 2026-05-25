@@ -164,7 +164,8 @@ router.post('/', upload.single('file'), async (req, res) => {
       suiteId: suite.id,
       projectId: targetProjectId,
       count: suite.testCases.length,
-      discoveredProject: aiProject?.name
+      discoveredProject: aiProject?.name,
+      structuredCases: structuredCases
     });
   } catch (error) {
     console.error('Upload Error:', error);

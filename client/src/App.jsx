@@ -116,6 +116,11 @@ const App = () => {
   const [extraJourneys, setExtraJourneys] = useState([]);
   const [subscriptionRequests, setSubscriptionRequests] = useState([]);
   const [hiddenProjectIds, setHiddenProjectIds] = useState([]);
+  const [isImportDestinationModalOpen, setIsImportDestinationModalOpen] = useState(false);
+  const [pendingImportScenarios, setPendingImportScenarios] = useState([]);
+  const [pendingImportProjectId, setPendingImportProjectId] = useState(null);
+  const [importDestination, setImportDestination] = useState('workload'); // 'workload' or 'both'
+  const [importLabTargetProjectId, setImportLabTargetProjectId] = useState('');
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
 
@@ -533,10 +538,15 @@ const App = () => {
       await fetchAllTestCases(newProjectId);
       await handleAnalyze();
       
+      // Populate pending states and open the Import Destination Modal
+      setPendingImportScenarios(res.data.structuredCases || []);
+      setPendingImportProjectId(newProjectId);
+      setImportLabTargetProjectId(newProjectId);
+      setImportDestination('workload');
+      setIsImportDestinationModalOpen(true);
+      
       if (res.data.discoveredProject) {
-        alert(`Project Discovered: ${res.data.discoveredProject}`);
-      } else {
-        alert('Test plan imported successfully!');
+        setAgentLogs(prev => [...prev, `System: Project Discovered - ${res.data.discoveredProject}`]);
       }
     } catch (err) {
       console.error('Upload failed', err);
@@ -573,7 +583,13 @@ const App = () => {
       await handleAnalyze();
       
       setAgentLogs(prev => [...prev, 'System: Manual Import Successful.']);
-      alert('Test plan imported manually!');
+      
+      // Populate pending states and open the Import Destination Modal
+      setPendingImportScenarios(res.data.structuredCases || []);
+      setPendingImportProjectId(newProjectId);
+      setImportLabTargetProjectId(newProjectId);
+      setImportDestination('workload');
+      setIsImportDestinationModalOpen(true);
     } catch (err) {
       console.error('Manual upload failed', err);
       alert('Failed to import test plan manually');
@@ -606,6 +622,33 @@ const App = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleImportDestinationConfirm = () => {
+    setIsImportDestinationModalOpen(false);
+
+    const targetProjectId = importLabTargetProjectId || pendingImportProjectId;
+
+    if (importDestination === 'both') {
+      if (targetProjectId) {
+        setSelectedProjectId(targetProjectId);
+      }
+      setGeneratedScenarios(pendingImportScenarios);
+      setCurrentView('lab');
+      setAgentLogs(prev => [...prev, `System: ${pendingImportScenarios.length} scenarios loaded into Scenario Lab for editing.`]);
+      alert(`${pendingImportScenarios.length} scenarios imported to workload AND loaded into Scenario Lab!`);
+    } else {
+      if (targetProjectId) {
+        setSelectedProjectId(targetProjectId);
+      }
+      alert(`${pendingImportScenarios.length} scenarios imported to workload successfully!`);
+    }
+
+    // Cleanup
+    setPendingImportScenarios([]);
+    setPendingImportProjectId(null);
+    setImportDestination('workload');
+    setImportLabTargetProjectId('');
   };
 
   const handleBackgroundUpload = async (e) => {
@@ -916,8 +959,27 @@ const App = () => {
     e.preventDefault();
     if (editingScenarioIndex === null || !editingScenarioData) return;
     
-    const updated = [...generatedScenarios];
-    updated[editingScenarioIndex] = editingScenarioData;
+    const applyToAll = window.confirm("Would you like to apply these validation points to all scenarios in your draft?");
+    
+    let updated;
+    if (applyToAll) {
+      const { orderBuild, orderCompletion, tcAssurance, billing } = editingScenarioData;
+      updated = generatedScenarios.map((s, i) => {
+        if (i === editingScenarioIndex) return editingScenarioData;
+        return {
+          ...s,
+          orderBuild,
+          orderCompletion,
+          tcAssurance,
+          billing
+        };
+      });
+      setAgentLogs(prev => [...prev, `System: Validation points synced to all ${generatedScenarios.length} scenarios.`]);
+    } else {
+      updated = [...generatedScenarios];
+      updated[editingScenarioIndex] = editingScenarioData;
+    }
+    
     setGeneratedScenarios(updated);
     setIsEditScenarioModalOpen(false);
     setEditingScenarioIndex(null);
@@ -2174,6 +2236,123 @@ const App = () => {
               >
                 <Upload className="w-4 h-4" />
                 Import Scenarios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Destination Modal */}
+      {isImportDestinationModalOpen && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 text-white">
+            <div className="p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/20 rounded-lg">
+                  <Brain className="w-5 h-5 text-indigo-400" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold">Import Destination</h3>
+                  <p className="text-sm text-slate-400">Choose where to place the imported scenarios.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="space-y-3">
+                <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Select Import Option</label>
+                
+                {/* Option 1: Workload Only */}
+                <div 
+                  onClick={() => setImportDestination('workload')}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    importDestination === 'workload' 
+                      ? 'bg-indigo-600/25 border-indigo-500 text-white' 
+                      : 'bg-slate-800/40 border-slate-700 hover:border-slate-600 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="radio" 
+                      name="importDestination" 
+                      value="workload" 
+                      checked={importDestination === 'workload'} 
+                      onChange={() => setImportDestination('workload')}
+                      className="accent-indigo-500 w-4 h-4"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">Import to Workload Only</p>
+                      <p className="text-xs text-slate-400 mt-1">Saves scenarios directly to the database workload.</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Option 2: Workload + Scenario Lab */}
+                <div 
+                  onClick={() => setImportDestination('both')}
+                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                    importDestination === 'both' 
+                      ? 'bg-indigo-600/25 border-indigo-500 text-white' 
+                      : 'bg-slate-800/40 border-slate-700 hover:border-slate-600 text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="radio" 
+                      name="importDestination" 
+                      value="both" 
+                      checked={importDestination === 'both'} 
+                      onChange={() => setImportDestination('both')}
+                      className="accent-indigo-500 w-4 h-4"
+                    />
+                    <div>
+                      <p className="font-medium text-sm">Import to Workload & Scenario Lab</p>
+                      <p className="text-xs text-slate-400 mt-1">Saves to DB and loads into Scenario Lab for drafts editing.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Project selector */}
+              {importDestination === 'both' && (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <label className="text-xs font-semibold text-slate-400 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-400" /> Target Scenario Lab Project
+                  </label>
+                  <select
+                    value={importLabTargetProjectId}
+                    onChange={(e) => setImportLabTargetProjectId(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 text-white text-sm rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="">Select Project...</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[10px] text-slate-500">Draft scenarios will be bound to this project tab in Scenario Lab.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 bg-slate-900/50 border-t border-slate-800 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsImportDestinationModalOpen(false);
+                  setPendingImportScenarios([]);
+                  setPendingImportProjectId(null);
+                  setImportLabTargetProjectId('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-slate-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportDestinationConfirm}
+                disabled={importDestination === 'both' && !importLabTargetProjectId}
+                className="px-6 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Confirm
               </button>
             </div>
           </div>
