@@ -856,7 +856,13 @@ const App = () => {
         console.error(err);
       }
       
-      const updatedList = customList.map(cv => cv.id === customVpId ? { ...cv, checked: isChecked } : cv);
+      let updatedList;
+      const exists = customList.some(cv => cv.id === customVpId);
+      if (exists) {
+        updatedList = customList.map(cv => cv.id === customVpId ? { ...cv, checked: isChecked } : cv);
+      } else {
+        updatedList = [...customList, { id: customVpId, label: 'Billing', checked: isChecked, value: tc.billing || '' }];
+      }
       
       await axios.patch(`${API_BASE}/test-cases/${caseId}/validations`, {
         customValidations: JSON.stringify(updatedList)
