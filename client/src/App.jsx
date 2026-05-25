@@ -849,9 +849,11 @@ const App = () => {
       
       let customList = [];
       try {
-        customList = typeof tc.customValidations === 'string' 
+        let parsed = typeof tc.customValidations === 'string' 
           ? JSON.parse(tc.customValidations) 
           : (tc.customValidations || []);
+        if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+        customList = Array.isArray(parsed) ? parsed : [];
       } catch (err) {
         console.error(err);
       }
@@ -2722,12 +2724,29 @@ const App = () => {
                   <p className="text-slate-400 text-sm">Managing {allTestCases.length} scenarios for {selectedProject?.name}</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsTrackerOpen(false)}
-                className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-400 hover:text-white"
-              >
-                <Plus className="w-8 h-8 rotate-45" />
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={async () => {
+                    if (window.confirm("Are you sure you want to reset all scenarios to PENDING? This will clear all checklist validations as well.")) {
+                      try {
+                        await axios.post(`${API_BASE}/test-cases/reset`, { projectId: selectedProjectId });
+                        await fetchAllTestCases();
+                      } catch (e) {
+                        console.error('Reset error', e);
+                      }
+                    }
+                  }}
+                  className="px-6 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl font-bold transition-all text-sm mr-4"
+                >
+                  Reset Tracker
+                </button>
+                <button 
+                  onClick={() => setIsTrackerOpen(false)}
+                  className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-400 hover:text-white"
+                >
+                  <Plus className="w-8 h-8 rotate-45" />
+                </button>
+              </div>
             </div>
 
             {/* Scrollable Content */}
@@ -2760,31 +2779,35 @@ const App = () => {
                                if (tc.orderBuild) checklist.push({ isCustom: false, field: 'checkOrderBuild', label: 'Order Build', checked: !!tc.checkOrderBuild, description: tc.orderBuild });
                                if (tc.orderCompletion) checklist.push({ isCustom: false, field: 'checkOrderCompletion', label: 'Completion', checked: !!tc.checkOrderCompletion, description: tc.orderCompletion });
                                if (tc.tcAssurance) checklist.push({ isCustom: false, field: 'checkPcsMcpr', label: 'T&C / Comms', checked: !!tc.checkPcsMcpr, description: tc.tcAssurance });
-                               if (tc.billing) {
-                                 // Render billing as custom item if not already in customValidations to maintain consistency
-                                 checklist.push({ isCustom: true, id: 'billing_check', label: 'Billing', checked: tc.customValidations?.includes('"id":"billing_check","checked":true') || false, description: tc.billing });
-                               }
-
+                               let parsedCustomList = [];
                                if (tc.customValidations) {
                                  try {
-                                   const customList = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
-                                   if (Array.isArray(customList)) {
-                                     customList.forEach(cv => {
-                                       if (cv.id !== 'billing_check') {
-                                         checklist.push({
-                                           isCustom: true,
-                                           id: cv.id,
-                                           label: cv.label || 'Custom Check',
-                                           checked: !!cv.checked,
-                                           description: cv.value || ''
-                                         });
-                                       }
-                                     });
-                                   }
-                                 } catch (err) {
-                                   // Skip
-                                 }
+                                   let parsed = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+                                   if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+                                   parsedCustomList = Array.isArray(parsed) ? parsed : [];
+                                 } catch (e) {}
                                }
+
+                               if (tc.billing) {
+                                 let isBillingChecked = false;
+                                 const billingItem = parsedCustomList.find(cv => cv.id === 'billing_check');
+                                 if (billingItem) {
+                                   isBillingChecked = !!billingItem.checked;
+                                 }
+                                 checklist.push({ isCustom: true, id: 'billing_check', label: 'Billing', checked: isBillingChecked, description: tc.billing });
+                               }
+
+                               parsedCustomList.forEach(cv => {
+                                 if (cv.id !== 'billing_check') {
+                                   checklist.push({
+                                     isCustom: true,
+                                     id: cv.id,
+                                     label: cv.label || 'Custom Check',
+                                     checked: !!cv.checked,
+                                     description: cv.value || ''
+                                   });
+                                 }
+                               });
 
                                return checklist.map((val, valIdx) => (
                                  <button
@@ -2886,6 +2909,12 @@ const App = () => {
                   <span className="text-amber-500 text-[10px] uppercase font-bold">Blocked</span>
                   <span className="text-amber-400 text-xl font-black">
                     {allTestCases.filter(c => c.status === 'BLOCKED').length}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-slate-400 text-[10px] uppercase font-bold">Pending</span>
+                  <span className="text-slate-300 text-xl font-black">
+                    {allTestCases.filter(c => c.status === 'PENDING').length}
                   </span>
                 </div>
               </div>

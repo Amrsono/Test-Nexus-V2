@@ -15,15 +15,70 @@ router.get('/', async (req, res) => {
     });
     const userProjectIds = userProjects.map(p => p.id);
 
+    if (projectId && !userProjectIds.includes(projectId)) {
+      return res.status(403).json({ error: 'Access denied to this project' });
+    }
+
     const testCases = await prisma.testCase.findMany({
       where: projectId 
-        ? { suite: { projectId, projectId: { in: userProjectIds } } } 
+        ? { suite: { projectId: projectId } } 
         : { suite: { projectId: { in: userProjectIds } } },
       include: { suite: true, assignments: { include: { tester: true } } },
       orderBy: { createdAt: 'desc' }
     });
     res.json(testCases);
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reset all test cases for a project to PENDING
+router.post('/reset', async (req, res) => {
+  const { projectId } = req.body;
+  if (!projectId) return res.status(400).json({ error: 'ProjectId is required' });
+
+  try {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not have permission to reset this project' });
+    }
+
+    const updated = await prisma.testCase.updateMany({
+      where: { suite: { projectId: projectId } },
+      data: {
+        status: 'PENDING',
+        checkUi: false,
+        checkOrderBuild: false,
+        checkOrderCompletion: false,
+        checkPcsMcpr: false
+      }
+    });
+
+    const testCasesToReset = await prisma.testCase.findMany({
+      where: { suite: { projectId: projectId }, customValidations: { not: null } }
+    });
+
+    for (const tc of testCasesToReset) {
+      if (tc.customValidations) {
+        try {
+          let cvs = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+          if (typeof cvs === 'string') cvs = JSON.parse(cvs);
+          if (Array.isArray(cvs)) {
+            const resetCvs = cvs.map(cv => ({ ...cv, checked: false }));
+            await prisma.testCase.update({
+              where: { id: tc.id },
+              data: { customValidations: JSON.stringify(resetCvs) }
+            });
+          }
+        } catch(e) {}
+      }
+    }
+
+    res.json({ count: updated.count });
+  } catch (error) {
+    console.error('Reset error:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -299,6 +299,97 @@ router.get('/project/:id/ppt', async (req, res) => {
       s7.addText("NO CRITICAL RISKS DETECTED IN CURRENT CYCLE", { x: 0.5, y: 2.0, w: 9, fontSize: 20, color: "10B981", align: "center", fontFace: "Arial" });
     }
 
+    // 8. Validation Points Deep Dive
+    let validationStats = {
+      ui: { total: 0, failed: 0, label: "UI Verification" },
+      build: { total: 0, failed: 0, label: "Order Build & Pricing" },
+      completion: { total: 0, failed: 0, label: "Status Sync & Completion" },
+      tc: { total: 0, failed: 0, label: "T&C and Comms" },
+      custom: { total: 0, failed: 0, label: "Custom Domain Validations" }
+    };
+
+    allCases.forEach(tc => {
+      validationStats.ui.total++;
+      if (!tc.checkUi) validationStats.ui.failed++;
+
+      if (tc.orderBuild) {
+        validationStats.build.total++;
+        if (!tc.checkOrderBuild) validationStats.build.failed++;
+      }
+      if (tc.orderCompletion) {
+        validationStats.completion.total++;
+        if (!tc.checkOrderCompletion) validationStats.completion.failed++;
+      }
+      if (tc.tcAssurance) {
+        validationStats.tc.total++;
+        if (!tc.checkPcsMcpr) validationStats.tc.failed++;
+      }
+      if (tc.customValidations) {
+        try {
+          let cvs = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+          if (typeof cvs === 'string') cvs = JSON.parse(cvs);
+          const finalArray = Array.isArray(cvs) ? cvs : [];
+          finalArray.forEach(cv => {
+            validationStats.custom.total++;
+            if (!cv.checked) validationStats.custom.failed++;
+          });
+        } catch (e) {}
+      }
+    });
+
+    const failedVPData = [
+      {
+        name: "Failed Validations",
+        labels: ["UI", "Build", "Completion", "T&C", "Custom"],
+        values: [
+          validationStats.ui.failed, 
+          validationStats.build.failed, 
+          validationStats.completion.failed, 
+          validationStats.tc.failed, 
+          validationStats.custom.failed
+        ]
+      }
+    ];
+
+    let s8 = pres.addSlide();
+    s8.background = { color: "020617" };
+    s8.addText("VALIDATION BOTTLENECK ANALYSIS", { x: 0.5, y: 0.3, fontSize: 24, bold: true, color: "FFFFFF", fontFace: "Arial" });
+    s8.addShape(pres.ShapeType.rect, { x: 0.5, y: 0.8, w: 2, h: 0.05, fill: { color: "8B5CF6" } }); 
+
+    s8.addChart(pres.ChartType.bar, failedVPData, {
+      x: 0.5, y: 1.2, w: 4.5, h: 4,
+      showLegend: false,
+      chartColors: ['8B5CF6'],
+      valAxisLabelColor: 'FFFFFF',
+      catAxisLabelColor: 'FFFFFF'
+    });
+
+    const totalVPFailed = validationStats.ui.failed + validationStats.build.failed + validationStats.completion.failed + validationStats.tc.failed + validationStats.custom.failed;
+    const totalVP = validationStats.ui.total + validationStats.build.total + validationStats.completion.total + validationStats.tc.total + validationStats.custom.total;
+    const failureRate = totalVP > 0 ? Math.round((totalVPFailed / totalVP) * 100) : 0;
+
+    s8.addShape(pres.ShapeType.rect, { x: 5.5, y: 1.2, w: 4, h: 1.0, fill: { color: "1E293B" }, line: { color: "8B5CF6", pt: 1 } });
+    s8.addText("EXECUTION IMPACT", { x: 5.6, y: 1.3, w: 3.8, fontSize: 10, bold: true, color: "8B5CF6", fontFace: "Arial" });
+    s8.addText(`There are currently ${totalVPFailed} unresolved validation checkpoints across all test journeys. This represents a ${failureRate}% gap in journey completion.`, { 
+      x: 5.6, y: 1.6, w: 3.8, h: 0.5, fontSize: 11, color: "FFFFFF", fontFace: "Arial", valign: "top" 
+    });
+
+    s8.addText("PRIMARY BLOCKERS & TIMELINE RISK", { x: 5.5, y: 2.5, w: 4, fontSize: 14, bold: true, color: "FFFFFF", fontFace: "Arial" });
+    
+    const sortedStats = Object.entries(validationStats).sort((a,b) => b[1].failed - a[1].failed);
+    const topBlocker = sortedStats[0][1];
+    const secondBlocker = sortedStats[1][1];
+
+    s8.addText(`1. ${topBlocker.label} (${topBlocker.failed} open)`, { x: 5.5, y: 2.9, w: 4, fontSize: 12, color: "EF4444", bold: true, fontFace: "Arial" });
+    s8.addText(`   Highest volume of unverified points. Direct threat to UAT sign-off.`, { x: 5.5, y: 3.1, w: 4, fontSize: 10, color: "94A3B8", fontFace: "Arial" });
+
+    s8.addText(`2. ${secondBlocker.label} (${secondBlocker.failed} open)`, { x: 5.5, y: 3.5, w: 4, fontSize: 12, color: "F59E0B", bold: true, fontFace: "Arial" });
+    s8.addText(`   Second major friction point. Requires dedicated validation resources.`, { x: 5.5, y: 3.7, w: 4, fontSize: 10, color: "94A3B8", fontFace: "Arial" });
+
+    s8.addText(`Recommendation: Shift testing capacity to target ${topBlocker.label} to restore timeline trajectory and mitigate schedule slippage.`, { 
+      x: 5.5, y: 4.2, w: 4, h: 0.8, fontSize: 11, color: "10B981", fontFace: "Arial", italic: true, valign: "top" 
+    });
+
     console.log("Generating buffer...");
     const data = await pres.write("nodebuffer");
     console.log("Buffer generated successfully.");
