@@ -340,7 +340,7 @@ router.get('/project/:id/ppt', async (req, res) => {
     const failedVPData = [
       {
         name: "Failed Validations",
-        labels: ["UI", "Build", "Completion", "T&C", "Custom"],
+        labels: ["UI", "Order Build", "Order Completion", "T&C", "Custom"],
         values: [
           validationStats.ui.failed, 
           validationStats.build.failed, 
