@@ -381,7 +381,7 @@ router.get('/project/:id/ppt', async (req, res) => {
     const secondBlocker = sortedStats[1][1];
 
     s8.addText(`1. ${topBlocker.label} (${topBlocker.failed} open)`, { x: 5.5, y: 2.7, w: 4, h: 0.25, fontSize: 12, color: "EF4444", bold: true, fontFace: "Arial", margin: 0 });
-    s8.addText(`   Highest volume of unverified points. Direct threat to UAT sign-off.`, { x: 5.5, y: 2.95, w: 4, h: 0.4, fontSize: 10, color: "94A3B8", fontFace: "Arial", valign: "top", margin: 0 });
+    s8.addText(`   Highest volume of unverified points. Direct threat to CJT sign-off.`, { x: 5.5, y: 2.95, w: 4, h: 0.4, fontSize: 10, color: "94A3B8", fontFace: "Arial", valign: "top", margin: 0 });
 
     s8.addText(`2. ${secondBlocker.label} (${secondBlocker.failed} open)`, { x: 5.5, y: 3.4, w: 4, h: 0.25, fontSize: 12, color: "F59E0B", bold: true, fontFace: "Arial", margin: 0 });
     s8.addText(`   Second major friction point. Requires dedicated validation resources.`, { x: 5.5, y: 3.65, w: 4, h: 0.4, fontSize: 10, color: "94A3B8", fontFace: "Arial", valign: "top", margin: 0 });
