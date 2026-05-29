@@ -971,9 +971,10 @@ const App = () => {
       }
 
       const res = await axios.post(`${API_BASE}/test-cases/export`, { 
-        testCases: filteredCases,
         projectName: selectedProject?.name || 'Test_Nexus',
-        projectId: selectedProjectId
+        projectId: selectedProjectId,
+        filterStatus: trackerFilterStatus,
+        filterTester: trackerFilterTester
       }, { responseType: 'blob' });
       
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

@@ -281,10 +281,7 @@ router.post('/bulk', async (req, res) => {
 
 // Export test cases to Excel for Global Execution Tracker
 router.post('/export', async (req, res) => {
-  const { testCases, projectName, projectId } = req.body;
-  if (!testCases || !Array.isArray(testCases)) {
-    return res.status(400).json({ error: 'testCases array is required' });
-  }
+  const { testCases: bodyTestCases, projectName, projectId, filterStatus, filterTester } = req.body;
 
   try {
     let project = null;
@@ -292,6 +289,35 @@ router.post('/export', async (req, res) => {
       project = await prisma.project.findUnique({
         where: { id: projectId }
       });
+    }
+
+    let testCases = [];
+    if (bodyTestCases && Array.isArray(bodyTestCases)) {
+      testCases = bodyTestCases;
+    } else if (projectId) {
+      const whereFilter = {
+        suite: { projectId: projectId }
+      };
+
+      if (filterStatus && filterStatus !== 'ALL') {
+        whereFilter.status = filterStatus;
+      }
+
+      if (filterTester && filterTester !== 'ALL') {
+        whereFilter.assignments = {
+          some: { testerId: filterTester }
+        };
+      }
+
+      testCases = await prisma.testCase.findMany({
+        where: whereFilter,
+        include: { suite: true, assignments: { include: { tester: true } } },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    if (!testCases || testCases.length === 0) {
+      return res.status(400).json({ error: 'No test cases found to export' });
     }
 
     const workbook = new ExcelJS.Workbook();
