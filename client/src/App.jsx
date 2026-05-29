@@ -243,6 +243,12 @@ const App = () => {
     }
   }, [selectedProjectId]);
 
+  // Reset hasLoadedDrafts whenever the project changes so the save effect
+  // cannot fire (and overwrite stored data with []) before the load effect reads it.
+  useEffect(() => {
+    setHasLoadedDrafts(false);
+  }, [selectedProjectId]);
+
   // Sync Drafts with LocalStorage for persistence across tabs/refresh (USER & PROJECT ISOLATED)
   useEffect(() => {
     if (!user || !selectedProjectId) return;
@@ -268,17 +274,23 @@ const App = () => {
     setHasLoadedDrafts(true);
   }, [user?.id, selectedProjectId]);
 
+  // Only save to localStorage once we have fully loaded (hasLoadedDrafts === true).
+  // Omit selectedProjectId from deps: we use the key built from it inside the effect,
+  // but we must NOT re-save when selectedProjectId just changed (that would write
+  // the old generatedScenarios into the new project's slot before the load runs).
   useEffect(() => {
     if (user && hasLoadedDrafts && selectedProjectId) {
       localStorage.setItem(`nexus_drafts_${user.id}_${selectedProjectId}`, JSON.stringify(generatedScenarios));
     }
-  }, [generatedScenarios, hasLoadedDrafts, user?.id, selectedProjectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedScenarios, hasLoadedDrafts]);
 
   useEffect(() => {
     if (user && hasLoadedDrafts && selectedProjectId) {
       localStorage.setItem(`nexus_lab_reqs_${user.id}_${selectedProjectId}`, labRequirements);
     }
-  }, [labRequirements, hasLoadedDrafts, user?.id, selectedProjectId]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [labRequirements, hasLoadedDrafts]);
 
   // Persist hidden projects
   useEffect(() => {
