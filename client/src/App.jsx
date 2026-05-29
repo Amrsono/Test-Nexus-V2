@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { Analytics } from '@vercel/analytics/react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, 
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell 
 } from 'recharts';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { 
   Activity, CheckCircle2, AlertCircle, Clock, 
   Upload, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
@@ -47,6 +48,53 @@ const MetricCard = ({ label, value, icon, change, trend, isDark }) => (
   </div>
 );
 
+/* ─── Animated number counter ─── */
+const AnimatedCounter = ({ value, duration = 1.2, className = '' }) => {
+  const [display, setDisplay] = useState(0);
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-40px' });
+  useEffect(() => {
+    if (!inView || value === 0) { setDisplay(value); return; }
+    let start = 0;
+    const step = Math.max(1, Math.ceil(value / (duration * 60)));
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= value) { setDisplay(value); clearInterval(timer); }
+      else setDisplay(start);
+    }, 1000 / 60);
+    return () => clearInterval(timer);
+  }, [value, inView, duration]);
+  return <span ref={ref} className={className}>{display}</span>;
+};
+
+/* ─── Framer motion variants ─── */
+const burndownContainerV = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
+};
+const burndownItemV = {
+  hidden: { opacity: 0, y: 24, scale: 0.96 },
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 260, damping: 24 } },
+};
+const barGrowV = (i) => ({
+  hidden: { scaleY: 0 },
+  show: { scaleY: 1, transition: { type: 'spring', stiffness: 180, damping: 18, delay: 0.6 + i * 0.07 } },
+});
+const pulseGlow = {
+  animate: {
+    scale: [1, 1.12, 1],
+    opacity: [0.45, 0.7, 0.45],
+    transition: { duration: 4, repeat: Infinity, ease: 'easeInOut' },
+  },
+};
+const floatOrb = {
+  animate: {
+    y: [0, -14, 0],
+    x: [0, 8, 0],
+    transition: { duration: 6, repeat: Infinity, ease: 'easeInOut' },
+  },
+};
+
 const App = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
@@ -61,6 +109,7 @@ const App = () => {
   const [testers, setTesters] = useState([]);
   const [selectedTesterId, setSelectedTesterId] = useState('');
   const [burndownData, setBurndownData] = useState([]);
+  const [burndownMeta, setBurndownMeta] = useState(null);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [newTester, setNewTester] = useState({ name: '', email: '' });
   const [editingTester, setEditingTester] = useState(null);
@@ -771,7 +820,13 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/test-cases/burndown?projectId=${id}`);
-      setBurndownData(res.data);
+      if (res.data && res.data.data) {
+        setBurndownData(res.data.data);
+        setBurndownMeta(res.data.meta);
+      } else {
+        setBurndownData(res.data);
+        setBurndownMeta(null);
+      }
     } catch (err) {
       console.error('Burndown error', err);
     }
@@ -1560,88 +1615,271 @@ const App = () => {
                 <MetricCard label="Pending" value={stats.pending} icon={<Clock className="text-slate-400" />} isDark={isDark} />
               </div>
 
-              <div className={`${cardBg} p-8 rounded-3xl shadow-xl`}>
-                <div className="flex justify-between items-center mb-8">
+              {/* ═══ ANIMATED BURNDOWN DASHBOARD ═══ */}
+              <motion.div
+                className={`${cardBg} p-8 rounded-3xl shadow-xl overflow-hidden relative`}
+                variants={burndownContainerV}
+                initial="hidden"
+                whileInView="show"
+                viewport={{ once: true, margin: '-60px' }}
+              >
+                {/* Decorative animated gradient orbs */}
+                <motion.div
+                  className="absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl pointer-events-none"
+                  style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.12) 0%, transparent 70%)' }}
+                  {...floatOrb}
+                />
+                <motion.div
+                  className="absolute -bottom-20 -left-20 w-56 h-56 rounded-full blur-3xl pointer-events-none"
+                  style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.10) 0%, transparent 70%)' }}
+                  animate={{ y: [0, 12, 0], x: [0, -10, 0], transition: { duration: 7, repeat: Infinity, ease: 'easeInOut' } }}
+                />
+                <motion.div
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-3xl pointer-events-none"
+                  style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.05) 0%, transparent 70%)' }}
+                  {...pulseGlow}
+                />
+
+                {/* Header row */}
+                <motion.div variants={burndownItemV} className="relative z-10 flex flex-wrap justify-between items-start gap-4 mb-8">
                   <div>
-                    <h3 className={`text-xl font-bold ${textColor}`}>Execution Burndown</h3>
-                    <p className={`text-sm ${subTextColor}`}>Actual vs. Ideal Progress</p>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${subTextColor}`}>Launch Readiness</p>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-2xl font-black ${stats.passed / (stats.total || 1) > 0.8 ? 'text-emerald-500' : 'text-amber-500'}`}>
-                          {Math.round((stats.passed / (stats.total || 1)) * 100)}%
-                        </span>
-                        <ArrowUpRight size={20} className="text-emerald-500" />
-                      </div>
-                    </div>
-                    <div className="w-32 h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-primary transition-all duration-1000" 
-                        style={{ width: `${(stats.passed / (stats.total || 1)) * 100}%` }}
+                    <div className="flex items-center gap-2 mb-1">
+                      <motion.div
+                        animate={{ rotate: [0, -8, 0, 8, 0] }}
+                        transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                      >
+                        <TrendingDown size={18} className="text-primary" />
+                      </motion.div>
+                      <h3 className={`text-xl font-bold ${textColor}`}>Execution Burndown</h3>
+                      <motion.div
+                        className="ml-2 w-2 h-2 rounded-full bg-emerald-400"
+                        animate={{ scale: [1, 1.5, 1], opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 2, repeat: Infinity }}
                       />
+                      <span className={`text-[9px] font-bold uppercase tracking-widest ${subTextColor}`}>Live</span>
                     </div>
+                    <p className={`text-sm ${subTextColor}`}>
+                      {burndownMeta ? `${burndownMeta.numWeeks}-week sprint · ${new Date(burndownMeta.startDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} → ${new Date(burndownMeta.goLiveDate).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}` : 'Actual vs. Ideal Progress'}
+                    </p>
                   </div>
-                </div>
-                <div className="h-[350px] w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <div className="lg:col-span-2">
+                  <div className="flex items-center gap-4">
+                    {/* Launch readiness badge — animated */}
+                    <motion.div
+                      className={`px-4 py-2 rounded-2xl text-center backdrop-blur-sm ${stats.passed/(stats.total||1) > 0.8 ? 'bg-emerald-500/10 ring-1 ring-emerald-500/20' : 'bg-amber-500/10 ring-1 ring-amber-500/20'}`}
+                      whileHover={{ scale: 1.08, boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                    >
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${subTextColor}`}>Launch Readiness</p>
+                      <p className={`text-2xl font-black ${stats.passed/(stats.total||1) > 0.8 ? 'text-emerald-500' : 'text-amber-500'}`}>
+                        <AnimatedCounter value={Math.round((stats.passed / (stats.total || 1)) * 100)} />%
+                      </p>
+                    </motion.div>
+                    {/* Days to go-live — animated */}
+                    {burndownMeta && (() => {
+                      const daysLeft = Math.max(0, Math.ceil((new Date(burndownMeta.goLiveDate) - new Date()) / (1000*60*60*24)));
+                      return (
+                        <motion.div
+                          className={`px-4 py-2 rounded-2xl text-center backdrop-blur-sm ${daysLeft < 7 ? 'bg-rose-500/10 ring-1 ring-rose-500/20' : 'bg-primary/10 ring-1 ring-primary/20'}`}
+                          whileHover={{ scale: 1.08, boxShadow: '0 8px 30px rgba(0,0,0,0.12)' }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                        >
+                          <p className={`text-[10px] font-black uppercase tracking-widest ${subTextColor}`}>Days Left</p>
+                          <p className={`text-2xl font-black ${daysLeft < 7 ? 'text-rose-500' : 'text-primary'}`}>
+                            <AnimatedCounter value={daysLeft} duration={0.8} />
+                          </p>
+                          {daysLeft < 7 && (
+                            <motion.div
+                              className="absolute inset-0 rounded-2xl ring-2 ring-rose-500/30"
+                              animate={{ opacity: [0.3, 0.7, 0.3] }}
+                              transition={{ duration: 1.5, repeat: Infinity }}
+                            />
+                          )}
+                        </motion.div>
+                      );
+                    })()}
+                  </div>
+                </motion.div>
+
+                {/* KPI strip — animated */}
+                {burndownMeta && (
+                  <motion.div variants={burndownItemV} className="relative z-10 grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    {[
+                      { label: 'Remaining', value: burndownMeta.currentRemaining, color: 'text-blue-500',    bg: 'bg-blue-500/10', ring: 'ring-blue-500/20',    glow: 'rgba(59,130,246,0.15)' },
+                      { label: 'Executed',  value: burndownMeta.currentExecuted,  color: 'text-indigo-500', bg: 'bg-indigo-500/10', ring: 'ring-indigo-500/20', glow: 'rgba(99,102,241,0.15)' },
+                      { label: 'Passed',    value: burndownMeta.currentPassed,    color: 'text-emerald-500',bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20',glow: 'rgba(16,185,129,0.15)' },
+                      { label: 'Blocked',   value: burndownMeta.currentBlocked,   color: 'text-amber-500',  bg: 'bg-amber-500/10', ring: 'ring-amber-500/20',  glow: 'rgba(245,158,11,0.15)' },
+                    ].map(({ label, value, color, bg, ring, glow }, idx) => (
+                      <motion.div
+                        key={label}
+                        className={`${bg} rounded-2xl p-3 text-center ring-1 ${ring} backdrop-blur-sm relative overflow-hidden`}
+                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 22, delay: 0.15 + idx * 0.08 }}
+                        whileHover={{ scale: 1.06, boxShadow: `0 12px 36px ${glow}` }}
+                      >
+                        <p className={`text-2xl font-black ${color}`}>
+                          <AnimatedCounter value={value} duration={1 + idx * 0.2} />
+                        </p>
+                        <p className={`text-[10px] font-bold uppercase tracking-widest ${subTextColor}`}>{label}</p>
+                        <div className={`mt-2 h-1.5 rounded-full ${isDark ? 'bg-white/10' : 'bg-black/10'} overflow-hidden`}>
+                          <motion.div
+                            className={`h-full rounded-full ${color.replace('text-','bg-')}`}
+                            initial={{ width: 0 }}
+                            whileInView={{ width: `${Math.round((value / (burndownMeta.total || 1)) * 100)}%` }}
+                            viewport={{ once: true }}
+                            transition={{ duration: 1.2, delay: 0.4 + idx * 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
+                          />
+                        </div>
+                      </motion.div>
+                    ))}
+                  </motion.div>
+                )}
+
+                {/* Main chart — animated entrance */}
+                <motion.div
+                  variants={burndownItemV}
+                  className="relative z-10 h-[280px] w-full mb-6"
+                >
+                  <motion.div
+                    className="w-full h-full"
+                    initial={{ opacity: 0, scaleX: 0.85 }}
+                    whileInView={{ opacity: 1, scaleX: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.9, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ transformOrigin: 'left center' }}
+                  >
                     <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={burndownData}>
+                      <AreaChart data={burndownData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                         <defs>
-                          <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#2563eb" stopOpacity={0.1}/>
-                            <stop offset="95%" stopColor="#2563eb" stopOpacity={0}/>
+                          <linearGradient id="bdActual" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                           </linearGradient>
+                          <linearGradient id="bdPassed" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#10b981" stopOpacity={0.25}/>
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="bdBlocked" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#f59e0b" stopOpacity={0.25}/>
+                            <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
+                          </linearGradient>
+                          {/* Animated glow filter for the actual line */}
+                          <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
+                            <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                            <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+                          </filter>
                         </defs>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#334155" : "#f1f5f9"} />
-                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} dy={10} minTickGap={60} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} />
-                        <Tooltip 
-                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', backgroundColor: isDark ? '#0f172a' : '#fff', color: isDark ? '#fff' : '#000' }}
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#1e293b' : '#f1f5f9'} />
+                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} dy={8} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10 }} />
+                        <Tooltip
+                          contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 40px rgba(0,0,0,0.15)', backgroundColor: isDark ? '#0f172a' : '#fff', color: isDark ? '#fff' : '#1e293b', padding: '12px 16px' }}
+                          formatter={(value, name) => {
+                            if (value === null || value === undefined) return ['—', name];
+                            const labels = { ideal: 'Ideal Remaining', actual: 'Actual Remaining', passed: 'Passed', blocked: 'Blocked', failed: 'Failed' };
+                            return [value, labels[name] || name];
+                          }}
+                          labelFormatter={(label, payload) => {
+                            const pt = payload && payload[0] && payload[0].payload;
+                            return pt ? `${label} · ${pt.label || ''}` : label;
+                          }}
+                          cursor={{ stroke: isDark ? '#475569' : '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}
                         />
-                        <Area type="monotone" dataKey="actual" stroke="#2563eb" strokeWidth={3} fillOpacity={1} fill="url(#colorActual)" />
-                        <Line type="monotone" dataKey="ideal" stroke="#e2e8f0" strokeWidth={2} strokeDasharray="5 5" dot={false} />
+                        <Legend
+                          iconType="circle" iconSize={8}
+                          formatter={(value) => <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#94a3b8' }}>{value}</span>}
+                          wrapperStyle={{ paddingTop: 8 }}
+                        />
+                        {/* Ideal burndown — dashed line */}
+                        <Area type="monotone" dataKey="ideal" name="Ideal" stroke={isDark ? '#334155' : '#cbd5e1'} strokeWidth={2} strokeDasharray="6 4" fill="none" dot={false} isAnimationActive={true} animationDuration={1800} animationEasing="ease-in-out" />
+                        {/* Actual remaining — blue filled area with glow */}
+                        <Area type="monotone" dataKey="actual" name="Actual" stroke="#3b82f6" strokeWidth={3} fill="url(#bdActual)" dot={{ r: 4, fill: '#3b82f6', strokeWidth: 2, stroke: '#1d4ed8' }} activeDot={{ r: 7, fill: '#3b82f6', stroke: '#fff', strokeWidth: 2 }} connectNulls={false} isAnimationActive={true} animationDuration={2000} animationEasing="ease-out" />
+                        {/* Passed — green area */}
+                        <Area type="monotone" dataKey="passed" name="Passed" stroke="#10b981" strokeWidth={2} fill="url(#bdPassed)" dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} connectNulls={false} isAnimationActive={true} animationDuration={2200} animationEasing="ease-out" />
+                        {/* Blocked — amber area */}
+                        <Area type="monotone" dataKey="blocked" name="Blocked" stroke="#f59e0b" strokeWidth={2} fill="url(#bdBlocked)" dot={{ r: 3, fill: '#f59e0b', strokeWidth: 0 }} connectNulls={false} isAnimationActive={true} animationDuration={2400} animationEasing="ease-out" />
                       </AreaChart>
                     </ResponsiveContainer>
-                  </div>
-                  <div className="flex flex-col justify-center">
-                    <h4 className={`text-xs font-bold uppercase tracking-widest ${subTextColor} mb-4 text-center`}>Status Distribution</h4>
-                    <div className="h-[200px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={[
-                              { name: 'Passed', value: stats.passed, fill: '#10B981' },
-                              { name: 'Failed', value: stats.failed, fill: '#EF4444' },
-                              { name: 'Blocked', value: stats.blocked, fill: '#F59E0B' },
-                              { name: 'Pending', value: stats.pending, fill: '#64748B' }
-                            ]}
-                            innerRadius={60}
-                            outerRadius={80}
-                            paddingAngle={5}
-                            dataKey="value"
+                  </motion.div>
+                </motion.div>
+
+                {/* Week-by-week progress bars — animated */}
+                {burndownData.length > 0 && (
+                  <motion.div variants={burndownItemV} className="relative z-10">
+                    <div className="flex items-center gap-2 mb-3">
+                      <p className={`text-[10px] font-black uppercase tracking-widest ${subTextColor}`}>Weekly Execution Progress</p>
+                      <motion.div
+                        className="flex-1 h-px"
+                        style={{ background: isDark ? 'linear-gradient(90deg, rgba(148,163,184,0.3), transparent)' : 'linear-gradient(90deg, rgba(148,163,184,0.2), transparent)' }}
+                        initial={{ scaleX: 0 }}
+                        whileInView={{ scaleX: 1 }}
+                        viewport={{ once: true }}
+                        transition={{ duration: 0.8, delay: 0.5 }}
+                        style={{ transformOrigin: 'left' }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-4 md:grid-cols-8 gap-2">
+                      {burndownData.map((w, i) => {
+                        const pct = burndownMeta && w.executed !== null
+                          ? Math.round((w.executed / (burndownMeta.total || 1)) * 100)
+                          : null;
+                        const isCurrent = w.isCurrentWeek;
+                        return (
+                          <motion.div
+                            key={i}
+                            className={`rounded-xl p-2 text-center relative ${isCurrent ? (isDark ? 'bg-primary/20 ring-1 ring-primary/50' : 'bg-primary/10 ring-1 ring-primary/30') : (isDark ? 'bg-white/5' : 'bg-slate-50')}`}
+                            initial={{ opacity: 0, y: 16 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 24, delay: 0.5 + i * 0.06 }}
+                            whileHover={{ scale: 1.08, y: -4, boxShadow: '0 8px 24px rgba(0,0,0,0.1)' }}
                           >
-                            <Cell key="cell-0" fill="#10B981" />
-                            <Cell key="cell-1" fill="#EF4444" />
-                            <Cell key="cell-2" fill="#F59E0B" />
-                            <Cell key="cell-3" fill="#64748B" />
-                          </Pie>
-                          <Tooltip />
-                        </PieChart>
-                      </ResponsiveContainer>
+                            {/* Current week pulsing dot */}
+                            {isCurrent && (
+                              <motion.div
+                                className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-primary"
+                                animate={{ scale: [1, 1.4, 1], opacity: [1, 0.5, 1] }}
+                                transition={{ duration: 1.5, repeat: Infinity }}
+                              />
+                            )}
+                            <p className={`text-[10px] font-black ${isCurrent ? 'text-primary' : subTextColor}`}>{w.name}</p>
+                            <p className={`text-[9px] ${subTextColor} mb-1`}>{w.label}</p>
+                            <div className={`h-16 rounded-lg ${isDark ? 'bg-white/10' : 'bg-slate-200'} relative overflow-hidden flex flex-col-reverse`}>
+                              {pct !== null ? (
+                                <motion.div
+                                  className="w-full rounded-lg bg-gradient-to-t from-blue-600 via-blue-500 to-blue-400"
+                                  style={{ originY: 1, transformOrigin: 'bottom' }}
+                                  initial={{ scaleY: 0 }}
+                                  whileInView={{ scaleY: 1 }}
+                                  viewport={{ once: true }}
+                                  transition={{ type: 'spring', stiffness: 180, damping: 18, delay: 0.7 + i * 0.07 }}
+                                  whileHover={{ filter: 'brightness(1.2)' }}
+                                  layout
+                                  style={{ height: `${pct}%`, transformOrigin: 'bottom' }}
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <span className={`text-[9px] ${subTextColor}`}>—</span>
+                                </div>
+                              )}
+                            </div>
+                            <motion.p
+                              className={`text-[9px] font-bold mt-1 ${isCurrent ? 'text-primary' : subTextColor}`}
+                              initial={{ opacity: 0 }}
+                              whileInView={{ opacity: 1 }}
+                              viewport={{ once: true }}
+                              transition={{ delay: 1.0 + i * 0.07 }}
+                            >
+                              {pct !== null ? `${pct}%` : ''}
+                            </motion.p>
+                          </motion.div>
+                        );
+                      })}
                     </div>
-                    <div className="mt-4 flex flex-wrap justify-center gap-4">
-                      {['Passed', 'Failed', 'Blocked', 'Pending'].map((s, i) => (
-                        <div key={s} className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full`} style={{ backgroundColor: ['#10B981', '#EF4444', '#F59E0B', '#64748B'][i] }} />
-                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">{s}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </motion.div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className={`${cardBg} p-6 rounded-3xl shadow-lg`}>

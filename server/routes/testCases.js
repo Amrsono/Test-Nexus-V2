@@ -170,55 +170,68 @@ router.get('/burndown', async (req, res) => {
 
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
-    const startDate = project.startDate || project.createdAt;
-    const goLiveDate = project.goLiveDate || new Date(new Date(startDate).getTime() + 14 * 24 * 60 * 60 * 1000);
-    
+    const startDate = project.startDate ? new Date(project.startDate) : new Date(project.createdAt);
+    const goLiveDate = project.goLiveDate
+      ? new Date(project.goLiveDate)
+      : new Date(startDate.getTime() + 8 * 7 * 24 * 60 * 60 * 1000);
+
     const allCases = project.testSuites.flatMap(suite => suite.testCases);
     const totalCases = allCases.length;
 
-    // Generate days array
-    const days = [];
-    let curr = new Date(startDate);
-    curr.setHours(0,0,0,0);
-    const end = new Date(goLiveDate);
-    end.setHours(23,59,59,999);
+    // Calculate number of weeks
+    const diffMs = goLiveDate.getTime() - startDate.getTime();
+    const numWeeks = Math.max(1, Math.min(16, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
+    const now = new Date();
 
-    // Limit to reasonable range to avoid infinite loops if dates are bad
-    let safetyCounter = 0;
-    while (curr <= end && safetyCounter < 1000) {
-      days.push(new Date(curr));
-      curr.setDate(curr.getDate() + 1);
-      safetyCounter++;
+    // Build weekly data points
+    const weeklyData = [];
+    for (let w = 1; w <= numWeeks; w++) {
+      const weekStart = new Date(startDate.getTime() + (w - 1) * 7 * 24 * 60 * 60 * 1000);
+      const weekEnd   = new Date(startDate.getTime() + w       * 7 * 24 * 60 * 60 * 1000);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const idealRemaining = Math.max(0, Math.round(totalCases * (1 - w / numWeeks)));
+      const isPast = weekEnd <= now;
+
+      let executed = null, remaining = null, passed = null, blocked = null, failed = null;
+      if (isPast) {
+        executed  = allCases.filter(c => c.status !== 'PENDING' && new Date(c.updatedAt) <= weekEnd).length;
+        passed    = allCases.filter(c => c.status === 'PASS'    && new Date(c.updatedAt) <= weekEnd).length;
+        blocked   = allCases.filter(c => c.status === 'BLOCKED' && new Date(c.updatedAt) <= weekEnd).length;
+        failed    = allCases.filter(c => c.status === 'FAIL'    && new Date(c.updatedAt) <= weekEnd).length;
+        remaining = Math.max(0, totalCases - executed);
+      }
+
+      const label = weekStart.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+      weeklyData.push({
+        name: `W${w}`,
+        label,
+        ideal: idealRemaining,
+        actual: remaining,       // null for future weeks
+        executed,                // null for future weeks
+        passed,
+        blocked,
+        failed,
+        isPast,
+        isCurrentWeek: weekStart <= now && now < weekEnd
+      });
     }
 
-    if (days.length === 0) days.push(new Date());
-
-    // Calculate Ideal and Actual
-    const data = days.map((day, index) => {
-      const dayEnd = new Date(day);
-      dayEnd.setHours(23, 59, 59, 999);
-
-      // Ideal: Linear reduction from totalCases down to 0
-      const ideal = days.length > 1 
-        ? Math.max(0, totalCases - (totalCases * (index / (days.length - 1))))
-        : 0;
-
-      // Actual: Total cases - cases completed UP TO this day
-      const completedUpToDay = allCases.filter(c => 
-        c.status !== 'PENDING' && 
-        new Date(c.updatedAt) <= dayEnd
-      ).length;
-
-      const actual = Math.max(0, totalCases - completedUpToDay);
-
-      return {
-        name: day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        ideal: Math.round(ideal),
-        actual: Math.round(actual)
-      };
+    res.json({
+      data: weeklyData,
+      meta: {
+        total: totalCases,
+        startDate: startDate.toISOString(),
+        goLiveDate: goLiveDate.toISOString(),
+        numWeeks,
+        currentExecuted:  allCases.filter(c => c.status !== 'PENDING').length,
+        currentPassed:    allCases.filter(c => c.status === 'PASS').length,
+        currentBlocked:   allCases.filter(c => c.status === 'BLOCKED').length,
+        currentFailed:    allCases.filter(c => c.status === 'FAIL').length,
+        currentRemaining: Math.max(0, totalCases - allCases.filter(c => c.status !== 'PENDING').length)
+      }
     });
-
-    res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
