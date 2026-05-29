@@ -653,17 +653,28 @@ router.post('/export', async (req, res) => {
       const rowNum = startRow + idx;
       const row = reportSheet.getRow(rowNum);
       row.height = 22;
+
+      // Pre-calculate metric details for this module
+      const epics = testCases.filter(c => (c.module || 'General') === mod);
+      const journeysCount = epics.length;
+      const noRunsCount = epics.filter(c => c.status === 'PENDING').length;
+      const executedCount = epics.filter(c => c.status !== 'PENDING').length;
+      const passedCount = epics.filter(c => c.status === 'PASS').length;
+      const inProgressCount = epics.filter(c => c.status === 'IN PROGRESS').length;
+      const failedCount = epics.filter(c => c.status === 'FAIL' || c.status === 'BLOCKED').length;
+      const execRate = journeysCount > 0 ? (executedCount / journeysCount) : 0;
+      const passRate = journeysCount > 0 ? (passedCount / journeysCount) : 0;
       
-      // Values
+      // Values with live formula + pre-calculated cached results for quick loading
       row.getCell(1).value = mod; // Epic
-      row.getCell(2).value = { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})` }; // Journeys
-      row.getCell(3).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PENDING")` }; // Pending
-      row.getCell(4).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "<>PENDING")` }; // Executed
-      row.getCell(5).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PASS")` }; // Passed
-      row.getCell(6).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "IN PROGRESS")` }; // In Progress
-      row.getCell(7).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "FAIL") + COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "BLOCKED")` }; // Blocked/Failed
-      row.getCell(8).value = { formula: `IF(B${rowNum}>0, D${rowNum}/B${rowNum}, 0)` }; // Execution Rate
-      row.getCell(9).value = { formula: `IF(B${rowNum}>0, E${rowNum}/B${rowNum}, 0)` }; // Pass Rate
+      row.getCell(2).value = { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})`, result: journeysCount }; // Journeys
+      row.getCell(3).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PENDING")`, result: noRunsCount }; // Pending
+      row.getCell(4).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "<>PENDING")`, result: executedCount }; // Executed
+      row.getCell(5).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PASS")`, result: passedCount }; // Passed
+      row.getCell(6).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "IN PROGRESS")`, result: inProgressCount }; // In Progress
+      row.getCell(7).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "FAIL") + COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "BLOCKED")`, result: failedCount }; // Blocked/Failed
+      row.getCell(8).value = { formula: `IF(B${rowNum}>0, D${rowNum}/B${rowNum}, 0)`, result: execRate }; // Execution Rate
+      row.getCell(9).value = { formula: `IF(B${rowNum}>0, E${rowNum}/B${rowNum}, 0)`, result: passRate }; // Pass Rate
       
       // Styling and number formatting
       row.getCell(8).numFmt = '0%';
@@ -682,15 +693,25 @@ router.post('/export', async (req, res) => {
     const totalRowNum = startRow + moduleList.length;
     const tRow = reportSheet.getRow(totalRowNum);
     tRow.height = 24;
+
+    const totalJourneys = testCases.length;
+    const totalNoRuns = testCases.filter(c => c.status === 'PENDING').length;
+    const totalExecuted = testCases.filter(c => c.status !== 'PENDING').length;
+    const totalPassed = testCases.filter(c => c.status === 'PASS').length;
+    const totalInProgress = testCases.filter(c => c.status === 'IN PROGRESS').length;
+    const totalFailed = testCases.filter(c => c.status === 'FAIL' || c.status === 'BLOCKED').length;
+    const totalExecRate = totalJourneys > 0 ? (totalExecuted / totalJourneys) : 0;
+    const totalPassRate = totalJourneys > 0 ? (totalPassed / totalJourneys) : 0;
+
     tRow.getCell(1).value = 'Total';
-    tRow.getCell(2).value = { formula: `SUM(B6:B${totalRowNum - 1})` };
-    tRow.getCell(3).value = { formula: `SUM(C6:C${totalRowNum - 1})` };
-    tRow.getCell(4).value = { formula: `SUM(D6:D${totalRowNum - 1})` };
-    tRow.getCell(5).value = { formula: `SUM(E6:E${totalRowNum - 1})` };
-    tRow.getCell(6).value = { formula: `SUM(F6:F${totalRowNum - 1})` };
-    tRow.getCell(7).value = { formula: `SUM(G6:G${totalRowNum - 1})` };
-    tRow.getCell(8).value = { formula: `IF(B${totalRowNum}>0, D${totalRowNum}/B${totalRowNum}, 0)` }; // Total Execution Rate
-    tRow.getCell(9).value = { formula: `IF(B${totalRowNum}>0, E${totalRowNum}/B${totalRowNum}, 0)` }; // Total Pass Rate
+    tRow.getCell(2).value = { formula: `SUM(B6:B${totalRowNum - 1})`, result: totalJourneys };
+    tRow.getCell(3).value = { formula: `SUM(C6:C${totalRowNum - 1})`, result: totalNoRuns };
+    tRow.getCell(4).value = { formula: `SUM(D6:D${totalRowNum - 1})`, result: totalExecuted };
+    tRow.getCell(5).value = { formula: `SUM(E6:E${totalRowNum - 1})`, result: totalPassed };
+    tRow.getCell(6).value = { formula: `SUM(F6:F${totalRowNum - 1})`, result: totalInProgress };
+    tRow.getCell(7).value = { formula: `SUM(G6:G${totalRowNum - 1})`, result: totalFailed };
+    tRow.getCell(8).value = { formula: `IF(B${totalRowNum}>0, D${totalRowNum}/B${totalRowNum}, 0)`, result: totalExecRate }; // Total Execution Rate
+    tRow.getCell(9).value = { formula: `IF(B${totalRowNum}>0, E${totalRowNum}/B${totalRowNum}, 0)`, result: totalPassRate }; // Total Pass Rate
     
     tRow.getCell(8).numFmt = '0%';
     tRow.getCell(9).numFmt = '0%';
@@ -736,18 +757,25 @@ router.post('/export', async (req, res) => {
     }
 
     // Populate Weekly Epic rows
+    const weeklyTotalsMap = {};
+    for (let w = 1; w <= 8; w++) {
+      weeklyTotalsMap[`w${w}`] = 0;
+    }
+    let totalJourneysSum = 0;
+
     moduleList.forEach((mod, idx) => {
       const rowNum = 2 + idx;
+      const totalEpicCases = testCases.filter(c => (c.module || 'General') === mod).length;
+      totalJourneysSum += totalEpicCases;
       
       const rowData = {
         epic: mod,
-        journeys: { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})` }
+        journeys: { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})`, result: totalEpicCases }
       };
 
       // If project has start date, pre-calculate actual remaining cases at the end of each completed week
       if (project && project.startDate) {
         const startDate = new Date(project.startDate);
-        const totalEpicCases = testCases.filter(c => (c.module || 'General') === mod).length;
         
         for (let w = 1; w <= 8; w++) {
           const weekEndDate = new Date(startDate.getTime() + w * 7 * 24 * 60 * 60 * 1000);
@@ -757,7 +785,9 @@ router.post('/export', async (req, res) => {
               c.status !== 'PENDING' && 
               new Date(c.updatedAt) <= weekEndDate
             ).length;
-            rowData[`w${w}`] = Math.max(0, totalEpicCases - completedUpToWeek);
+            const remaining = Math.max(0, totalEpicCases - completedUpToWeek);
+            rowData[`w${w}`] = remaining;
+            weeklyTotalsMap[`w${w}`] += remaining;
           } else {
             rowData[`w${w}`] = ''; // blank for future weeks
           }
@@ -788,11 +818,19 @@ router.post('/export', async (req, res) => {
     const bdTRow = bdSheet.getRow(bdTotalRow);
     bdTRow.height = 24;
     bdTRow.getCell(1).value = 'Total';
-    bdTRow.getCell(4).value = { formula: `SUM(D2:D${bdTotalRow-1})` };
+    bdTRow.getCell(4).value = { formula: `SUM(D2:D${bdTotalRow-1})`, result: totalJourneysSum };
     
     for (let w = 1; w <= 8; w++) {
       const colLetter = getColumnLetter(4 + w); // E, F, G, H, I, J, K, L
-      bdTRow.getCell(4 + w).value = { formula: `SUM(${colLetter}2:${colLetter}${bdTotalRow-1})` };
+      const formulaObj = { formula: `SUM(${colLetter}2:${colLetter}${bdTotalRow-1})` };
+      if (project && project.startDate) {
+        const startDate = new Date(project.startDate);
+        const weekEndDate = new Date(startDate.getTime() + w * 7 * 24 * 60 * 60 * 1000);
+        if (weekEndDate <= new Date()) {
+          formulaObj.result = weeklyTotalsMap[`w${w}`];
+        }
+      }
+      bdTRow.getCell(4 + w).value = formulaObj;
     }
 
     bdTRow.font = { bold: true };
