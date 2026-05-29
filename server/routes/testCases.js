@@ -729,121 +729,160 @@ router.post('/export', async (req, res) => {
     }
 
     // === Add Burndown Chart Worksheet ===
+    // Proper time-series burndown: one row per week, columns for all KPIs
     const bdSheet = workbook.addWorksheet('Burndown Chart');
-    
-    bdSheet.columns = [
-      { header: 'Epic', key: 'epic', width: 35 },
-      { header: 'CJT release', key: 'release', width: 15 },
-      { header: 'Duration', key: 'duration', width: 15 },
-      { header: 'Journeys', key: 'journeys', width: 12 },
-      { header: 'Week 1', key: 'w1', width: 10 },
-      { header: 'Week 2', key: 'w2', width: 10 },
-      { header: 'Week 3', key: 'w3', width: 10 },
-      { header: 'Week 4', key: 'w4', width: 10 },
-      { header: 'Week 5', key: 'w5', width: 10 },
-      { header: 'Week 6', key: 'w6', width: 10 },
-      { header: 'Week 7', key: 'w7', width: 10 },
-      { header: 'Week 8', key: 'w8', width: 10 }
+
+    // Column widths
+    const bdCols = [
+      { width: 10 },  // A: Week
+      { width: 22 },  // B: Date Range
+      { width: 16 },  // C: Total Journeys
+      { width: 18 },  // D: Ideal Remaining
+      { width: 20 },  // E: Cumulative Executed
+      { width: 18 },  // F: Actual Remaining
+      { width: 14 },  // G: Blocked
+      { width: 14 },  // H: Passed
+      { width: 14 },  // I: Failed
     ];
-
-    // Style Burndown Chart Header Row
-    const bdHeader = bdSheet.getRow(1);
-    bdHeader.height = 32;
-    for (let c = 1; c <= 12; c++) {
-      const cell = bdHeader.getCell(c);
-      cell.font = { bold: true, color: { argb: headerFontColor }, size: 10 };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgColor } };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    }
-
-    // Populate Weekly Epic rows
-    const weeklyTotalsMap = {};
-    for (let w = 1; w <= 8; w++) {
-      weeklyTotalsMap[`w${w}`] = 0;
-    }
-    let totalJourneysSum = 0;
-
-    moduleList.forEach((mod, idx) => {
-      const rowNum = 2 + idx;
-      const totalEpicCases = testCases.filter(c => (c.module || 'General') === mod).length;
-      totalJourneysSum += totalEpicCases;
-      
-      const rowData = {
-        epic: mod,
-        journeys: { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})`, result: totalEpicCases }
-      };
-
-      // If project has start date, pre-calculate actual remaining cases at the end of each completed week
-      if (project && project.startDate) {
-        const startDate = new Date(project.startDate);
-        
-        for (let w = 1; w <= 8; w++) {
-          const weekEndDate = new Date(startDate.getTime() + w * 7 * 24 * 60 * 60 * 1000);
-          if (weekEndDate <= new Date()) {
-            const completedUpToWeek = testCases.filter(c => 
-              (c.module || 'General') === mod && 
-              c.status !== 'PENDING' && 
-              new Date(c.updatedAt) <= weekEndDate
-            ).length;
-            const remaining = Math.max(0, totalEpicCases - completedUpToWeek);
-            rowData[`w${w}`] = remaining;
-            weeklyTotalsMap[`w${w}`] += remaining;
-          } else {
-            rowData[`w${w}`] = ''; // blank for future weeks
-          }
-        }
-      } else {
-        for (let w = 1; w <= 8; w++) {
-          rowData[`w${w}`] = ''; // blank if no startDate
-        }
-      }
-
-      const addedRow = bdSheet.addRow(rowData);
-      addedRow.height = 22;
-
-      // Apply styling and thin borders
-      for (let c = 1; c <= 12; c++) {
-        const cell = addedRow.getCell(c);
-        cell.border = thinBorder;
-        cell.alignment = { vertical: 'middle', horizontal: c === 1 ? 'left' : 'center' };
-        cell.font = { size: 10 };
-        if (c >= 4) {
-          cell.numFmt = '#,##0';
-        }
-      }
+    bdCols.forEach((col, idx) => {
+      bdSheet.getColumn(idx + 1).width = col.width;
     });
 
-    // Add Weekly Sum Totals Row
-    const bdTotalRow = 2 + moduleList.length;
-    const bdTRow = bdSheet.getRow(bdTotalRow);
-    bdTRow.height = 24;
-    bdTRow.getCell(1).value = 'Total';
-    bdTRow.getCell(4).value = { formula: `SUM(D2:D${bdTotalRow-1})`, result: totalJourneysSum };
-    
-    for (let w = 1; w <= 8; w++) {
-      const colLetter = getColumnLetter(4 + w); // E, F, G, H, I, J, K, L
-      const formulaObj = { formula: `SUM(${colLetter}2:${colLetter}${bdTotalRow-1})` };
-      if (project && project.startDate) {
-        const startDate = new Date(project.startDate);
-        const weekEndDate = new Date(startDate.getTime() + w * 7 * 24 * 60 * 60 * 1000);
-        if (weekEndDate <= new Date()) {
-          formulaObj.result = weeklyTotalsMap[`w${w}`];
-        }
-      }
-      bdTRow.getCell(4 + w).value = formulaObj;
+    // ── Banner row 1: KPI column headers ────────────────────────────────────
+    const bdHeaderLabels = [
+      'Week', 'Period', 'Total Journeys', 'Ideal Remaining',
+      'Executed (Cumul.)', 'Actual Remaining', 'Blocked', 'Passed', 'Failed'
+    ];
+    const bdHeaderRow = bdSheet.getRow(1);
+    bdHeaderRow.height = 32;
+    bdHeaderLabels.forEach((label, idx) => {
+      const cell = bdHeaderRow.getCell(idx + 1);
+      cell.value = label;
+      cell.font = { bold: true, color: { argb: headerFontColor }, size: 10 };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgColor } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+
+    // ── Derive week boundaries from project dates ────────────────────────────
+    const totalJourneysAll = testCases.length;
+    const now = new Date();
+
+    let bdStartDate = project && project.startDate ? new Date(project.startDate) : null;
+    let bdEndDate   = project && project.goLiveDate ? new Date(project.goLiveDate) : null;
+
+    // Calculate number of weeks to display (max 16, min 1)
+    let numWeeks = 8;
+    if (bdStartDate && bdEndDate) {
+      const diffMs = bdEndDate.getTime() - bdStartDate.getTime();
+      numWeeks = Math.max(1, Math.min(16, Math.ceil(diffMs / (7 * 24 * 60 * 60 * 1000))));
     }
 
-    bdTRow.font = { bold: true };
-    for (let c = 1; c <= 12; c++) {
-      const cell = bdTRow.getCell(c);
+    // Format helper: "15 Jun"
+    const fmtDate = (d) => d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+
+    // ── Data rows: one per week ─────────────────────────────────────────────
+    let dataRowIndex = 2;
+    for (let w = 1; w <= numWeeks; w++) {
+      const row = bdSheet.getRow(dataRowIndex);
+      row.height = 22;
+
+      // Week boundaries
+      let weekStart, weekEnd;
+      if (bdStartDate) {
+        weekStart = new Date(bdStartDate.getTime() + (w - 1) * 7 * 24 * 60 * 60 * 1000);
+        weekEnd   = new Date(bdStartDate.getTime() + w       * 7 * 24 * 60 * 60 * 1000);
+      }
+
+      // Ideal remaining = linear burndown from total to 0
+      const idealRemaining = Math.max(0, Math.round(totalJourneysAll * (1 - w / numWeeks)));
+
+      // Actual metrics — only filled for weeks that have already ended
+      const weekIsPast = weekEnd && weekEnd <= now;
+      let executed = null, remaining = null, blocked = null, passed = null, failed = null;
+
+      if (weekIsPast && bdStartDate) {
+        executed  = testCases.filter(c => c.status !== 'PENDING' && new Date(c.updatedAt) <= weekEnd).length;
+        blocked   = testCases.filter(c => c.status === 'BLOCKED'  && new Date(c.updatedAt) <= weekEnd).length;
+        passed    = testCases.filter(c => c.status === 'PASS'     && new Date(c.updatedAt) <= weekEnd).length;
+        failed    = testCases.filter(c => c.status === 'FAIL'     && new Date(c.updatedAt) <= weekEnd).length;
+        remaining = Math.max(0, totalJourneysAll - executed);
+      }
+
+      // Fill cells
+      row.getCell(1).value = `Week ${w}`;
+      row.getCell(2).value = (weekStart && weekEnd)
+        ? `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}`
+        : `Week ${w}`;
+      row.getCell(3).value = totalJourneysAll;
+      row.getCell(4).value = idealRemaining;
+      row.getCell(5).value = executed   !== null ? executed   : '';
+      row.getCell(6).value = remaining  !== null ? remaining  : '';
+      row.getCell(7).value = blocked    !== null ? blocked    : '';
+      row.getCell(8).value = passed     !== null ? passed     : '';
+      row.getCell(9).value = failed     !== null ? failed     : '';
+
+      // Styling
+      for (let c = 1; c <= 9; c++) {
+        const cell = row.getCell(c);
+        cell.border = thinBorder;
+        cell.alignment = { vertical: 'middle', horizontal: c <= 2 ? 'left' : 'center' };
+        cell.font = { size: 10 };
+        if (c >= 3) cell.numFmt = '#,##0';
+      }
+
+      // Highlight current week light yellow
+      const isCurrentWeek = weekStart && weekEnd && weekStart <= now && now < weekEnd;
+      if (isCurrentWeek) {
+        for (let c = 1; c <= 9; c++) {
+          row.getCell(c).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF9C4' } };
+        }
+      }
+
+      // Colour the Actual Remaining cell: green if < ideal, red if >
+      if (remaining !== null) {
+        const remCell = row.getCell(6);
+        if (remaining <= idealRemaining) {
+          remCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } }; // green-100
+          remCell.font = { size: 10, bold: true, color: { argb: 'FF065F46' } };
+        } else {
+          remCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEE2E2' } }; // red-100
+          remCell.font = { size: 10, bold: true, color: { argb: 'FF991B1B' } };
+        }
+      }
+
+      dataRowIndex++;
+    }
+
+    // ── Summary / Current Status row ────────────────────────────────────────
+    const bdSumRow = bdSheet.getRow(dataRowIndex);
+    bdSumRow.height = 26;
+
+    const currentExecuted  = testCases.filter(c => c.status !== 'PENDING').length;
+    const currentBlocked   = testCases.filter(c => c.status === 'BLOCKED').length;
+    const currentPassed    = testCases.filter(c => c.status === 'PASS').length;
+    const currentFailed    = testCases.filter(c => c.status === 'FAIL').length;
+    const currentRemaining = Math.max(0, totalJourneysAll - currentExecuted);
+
+    bdSumRow.getCell(1).value = 'NOW';
+    bdSumRow.getCell(2).value = fmtDate(now);
+    bdSumRow.getCell(3).value = totalJourneysAll;
+    bdSumRow.getCell(4).value = '—';          // no ideal for "now"
+    bdSumRow.getCell(5).value = currentExecuted;
+    bdSumRow.getCell(6).value = currentRemaining;
+    bdSumRow.getCell(7).value = currentBlocked;
+    bdSumRow.getCell(8).value = currentPassed;
+    bdSumRow.getCell(9).value = currentFailed;
+
+    bdSumRow.font = { bold: true, color: { argb: headerFontColor } };
+    for (let c = 1; c <= 9; c++) {
+      const cell = bdSumRow.getCell(c);
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: headerBgColor } };
       cell.border = {
-        top: { style: 'thin', color: { argb: 'FF000000' } },
+        top:    { style: 'thin',   color: { argb: 'FF000000' } },
         bottom: { style: 'double', color: { argb: 'FF000000' } }
       };
-      cell.alignment = { vertical: 'middle', horizontal: c === 1 ? 'left' : 'center' };
-      if (c >= 4) {
-        cell.numFmt = '#,##0';
-      }
+      cell.alignment = { vertical: 'middle', horizontal: c <= 2 ? 'left' : 'center' };
+      if (c >= 3 && c !== 4) cell.numFmt = '#,##0';
     }
 
     // Save & stream workbook
