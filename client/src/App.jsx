@@ -245,7 +245,7 @@ const App = () => {
 
   // Sync Drafts with LocalStorage for persistence across tabs/refresh (USER & PROJECT ISOLATED)
   useEffect(() => {
-    if (!user || !hasLoadedDrafts || !selectedProjectId) return;
+    if (!user || !selectedProjectId) return;
     
     const draftKey = `nexus_drafts_${user.id}_${selectedProjectId}`;
     const reqsKey = `nexus_lab_reqs_${user.id}_${selectedProjectId}`;
@@ -950,6 +950,50 @@ const App = () => {
       console.error('Excel export failed', err);
       const msg = err.response?.data?.error || err.message || 'Unknown error';
       alert(`Failed to export Excel: ${msg}. Please check your connection and try again.`);
+    }
+  };
+
+  const handleExportExecutionTracker = async () => {
+    if (allTestCases.length === 0) return;
+    try {
+      const filteredCases = allTestCases.filter(tc => {
+        if (trackerFilterStatus !== 'ALL' && tc.status !== trackerFilterStatus) return false;
+        if (trackerFilterTester !== 'ALL') {
+          const isAssigned = tc.assignments?.some(a => a.testerId === trackerFilterTester);
+          if (!isAssigned) return false;
+        }
+        return true;
+      });
+
+      if (filteredCases.length === 0) {
+        alert("No test cases match the current filters to export.");
+        return;
+      }
+
+      const res = await axios.post(`${API_BASE}/test-cases/export`, { 
+        testCases: filteredCases,
+        projectName: selectedProject?.name || 'Test_Nexus',
+        projectId: selectedProjectId
+      }, { responseType: 'blob' });
+      
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const fileName = `${(selectedProject?.name || 'Test_Nexus').replace(/[^a-z0-9]/gi, '_')}_Execution_Tracker.xlsx`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err) {
+      console.error('Execution tracker export failed', err);
+      const msg = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to export Tracker to Excel: ${msg}.`);
     }
   };
 
@@ -2739,6 +2783,12 @@ const App = () => {
                 </div>
               </div>
               <div className="flex items-center gap-4">
+                <button
+                  onClick={handleExportExecutionTracker}
+                  className="px-6 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-xl font-bold transition-all text-sm"
+                >
+                  Export Tracker
+                </button>
                 <button
                   onClick={async () => {
                     if (window.confirm("Are you sure you want to reset all scenarios to PENDING? This will clear all checklist validations as well.")) {
