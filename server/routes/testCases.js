@@ -123,6 +123,44 @@ router.patch('/:id/validations', async (req, res) => {
   }
 });
 
+// Update all test case details (used when refining committed scenarios)
+router.patch('/:id', async (req, res) => {
+  const { id } = req.params;
+  const { 
+    summary, steps, expectedResult, priority, module, 
+    orderBuild, orderCompletion, tcAssurance, billing, customValidations,
+    checkUi, checkOrderBuild, checkOrderCompletion, checkPcsMcpr, status
+  } = req.body;
+  try {
+    const updated = await prisma.testCase.update({
+      where: { id },
+      data: {
+        ...(summary !== undefined && { summary }),
+        ...(steps !== undefined && { steps }),
+        ...(expectedResult !== undefined && { expectedResult }),
+        ...(priority !== undefined && { priority }),
+        ...(module !== undefined && { module }),
+        ...(orderBuild !== undefined && { orderBuild }),
+        ...(orderCompletion !== undefined && { orderCompletion }),
+        ...(tcAssurance !== undefined && { tcAssurance }),
+        ...(billing !== undefined && { billing }),
+        ...(customValidations !== undefined && { 
+          customValidations: typeof customValidations === 'string' ? customValidations : JSON.stringify(customValidations) 
+        }),
+        ...(checkUi !== undefined && { checkUi }),
+        ...(checkOrderBuild !== undefined && { checkOrderBuild }),
+        ...(checkOrderCompletion !== undefined && { checkOrderCompletion }),
+        ...(checkPcsMcpr !== undefined && { checkPcsMcpr }),
+        ...(status !== undefined && { status })
+      }
+    });
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Get stats for dashboard (filtered by project)
 router.get('/stats', async (req, res) => {
   const { projectId } = req.query;
@@ -261,7 +299,7 @@ router.post('/bulk', async (req, res) => {
       });
 
       // 2. Create all test cases
-      const createdCases = await tx.testCase.createMany({
+      await tx.testCase.createMany({
         data: testCases.map(tc => ({
           summary: String(tc.summary || 'Untitled Scenario'),
           steps: String(tc.steps || 'No steps provided'),
@@ -282,7 +320,12 @@ router.post('/bulk', async (req, res) => {
         }))
       });
 
-      return { suite, count: createdCases.count };
+      // Retrieve the newly created test cases
+      const cases = await tx.testCase.findMany({
+        where: { suiteId: suite.id }
+      });
+
+      return { suite, count: cases.length, testCases: cases };
     });
 
     res.json(result);
@@ -431,6 +474,7 @@ router.post('/export', async (req, res) => {
     const customLabelsList = Array.from(customValidationLabels);
 
     const baseColumns = [
+      { header: 'Case ID', key: 'id', width: 25 },
       { header: '#', key: 'idx', width: 6 },
       { header: 'Journey Summary', key: 'summary', width: 45 },
       { header: 'Execution Priority', key: 'priority', width: 18 },
@@ -477,6 +521,7 @@ router.post('/export', async (req, res) => {
     // Add Data & Style Rows
     testCases.forEach((tc, i) => {
       const rowData = {
+        id: tc.id || '',
         idx: i + 1,
         summary: tc.summary || '',
         priority: tc.priority || 'MEDIUM',
@@ -907,6 +952,210 @@ router.post('/export', async (req, res) => {
     res.end();
   } catch (error) {
     console.error('Tracker Export Route Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Sync database test cases with an uploaded modified Excel sheet
+const multer = require('multer');
+const upload = multer({ storage: multer.memoryStorage() });
+
+router.post('/sync', upload.single('file'), async (req, res) => {
+  const { projectId } = req.body;
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+  if (!projectId) {
+    return res.status(400).json({ error: 'ProjectId is required' });
+  }
+
+  try {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not own this project' });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(req.file.buffer);
+    const sheet = workbook.getWorksheet('Execution Tracker');
+    if (!sheet) {
+      return res.status(400).json({ error: 'Invalid file format: "Execution Tracker" sheet not found.' });
+    }
+
+    const headers = [];
+    const headerRow = sheet.getRow(1);
+    headerRow.eachCell((cell, colNumber) => {
+      headers[colNumber] = cell.value ? String(cell.value).trim() : '';
+    });
+
+    const getCellValue = (cell) => {
+      if (!cell) return '';
+      if (cell.value && typeof cell.value === 'object') {
+        if (cell.value.result !== undefined) return String(cell.value.result).trim();
+        if (cell.value.text !== undefined) return String(cell.value.text).trim();
+        return String(cell.value).trim();
+      }
+      return cell.value ? String(cell.value).trim() : '';
+    };
+
+    const getValByHeader = (row, headerName) => {
+      const idx = headers.indexOf(headerName);
+      if (idx === -1) return '';
+      return getCellValue(row.getCell(idx));
+    };
+
+    // Load existing test cases to know which ones to update vs create
+    const existingTestCases = await prisma.testCase.findMany({
+      where: { suite: { projectId } }
+    });
+    const existingIds = new Set(existingTestCases.map(tc => tc.id));
+
+    // Find or create a default suite for new cases imported via sync
+    let defaultSuite = await prisma.testSuite.findFirst({
+      where: { projectId }
+    });
+    if (!defaultSuite) {
+      defaultSuite = await prisma.testSuite.create({
+        data: {
+          name: 'Excel Import Suite',
+          description: 'Default suite for Excel imports',
+          projectId
+        }
+      });
+    }
+    const suiteId = defaultSuite.id;
+
+    const updatedCases = [];
+    const rowPromises = [];
+
+    sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber === 1) return; // skip header
+
+      const id = getCellValue(row.getCell(1));
+      const summary = getValByHeader(row, 'Journey Summary');
+
+      // Skip row if both Case ID and Summary are empty (blank rows at end of sheet)
+      if (!id && !summary) return;
+
+      const priority = getValByHeader(row, 'Execution Priority');
+      const module = getValByHeader(row, 'Module');
+      const steps = getValByHeader(row, 'Test Steps');
+      const expectedResult = getValByHeader(row, 'Expected Outcome');
+      const checkUi = getValByHeader(row, 'UI Valid Status') === 'PASS';
+      const orderBuild = getValByHeader(row, 'Order Build Detail');
+      const checkOrderBuild = getValByHeader(row, 'Order Build Status') === 'PASS';
+      const orderCompletion = getValByHeader(row, 'Completion Detail');
+      const checkOrderCompletion = getValByHeader(row, 'Completion Status') === 'PASS';
+      const tcAssurance = getValByHeader(row, 'T&C / Comms Detail');
+      const checkPcsMcpr = getValByHeader(row, 'T&C / Comms Status') === 'PASS';
+      const billing = getValByHeader(row, 'Billing Detail');
+      const checkBilling = getValByHeader(row, 'Billing Status') === 'PASS';
+      const status = getValByHeader(row, 'OVERALL JOURNEY STATUS') || 'PENDING';
+
+      // Parse custom validations
+      const customValidations = [];
+      
+      // Billing Check is a custom validation in db representation
+      if (billing && billing !== 'N/A') {
+        customValidations.push({
+          id: 'billing_check',
+          label: 'Billing Check',
+          value: billing,
+          checked: checkBilling
+        });
+      }
+
+      headers.forEach((h, idx) => {
+        if (h && h.endsWith(' Detail') && 
+            h !== 'Order Build Detail' && 
+            h !== 'Completion Detail' && 
+            h !== 'T&C / Comms Detail' && 
+            h !== 'Billing Detail'
+        ) {
+          const label = h.substring(0, h.length - 7); // remove ' Detail'
+          const detailValue = getCellValue(row.getCell(idx));
+          const statusHeader = `${label} Status`;
+          const statusIdx = headers.indexOf(statusHeader);
+          let checked = false;
+          if (statusIdx !== -1) {
+            checked = getCellValue(row.getCell(statusIdx)) === 'PASS';
+          }
+          if (detailValue && detailValue !== 'N/A') {
+            customValidations.push({
+              id: `custom_${label.replace(/\s+/g, '_')}`,
+              label: label,
+              value: detailValue,
+              checked: checked
+            });
+          }
+        }
+      });
+
+      const isExisting = id && existingIds.has(id);
+
+      if (isExisting) {
+        rowPromises.push(
+          prisma.testCase.update({
+            where: { id },
+            data: {
+              ...(summary && { summary }),
+              ...(priority && { priority }),
+              ...(module && { module }),
+              ...(steps && { steps }),
+              ...(expectedResult && { expectedResult }),
+              checkUi,
+              ...(orderBuild && { orderBuild }),
+              checkOrderBuild,
+              ...(orderCompletion && { orderCompletion }),
+              checkOrderCompletion,
+              ...(tcAssurance && { tcAssurance }),
+              checkPcsMcpr,
+              ...(billing && { billing }),
+              customValidations: customValidations.length > 0 ? JSON.stringify(customValidations) : null,
+              status
+            }
+          }).then(tc => {
+            updatedCases.push(tc);
+          }).catch(err => {
+            console.error(`Failed to update case ID ${id}:`, err.message);
+          })
+        );
+      } else {
+        rowPromises.push(
+          prisma.testCase.create({
+            data: {
+              summary: summary || 'Unnamed Journey',
+              priority: priority || 'MEDIUM',
+              module: module || 'General',
+              steps: steps || 'No steps provided.',
+              expectedResult: expectedResult || 'Expected outcome not defined.',
+              checkUi,
+              orderBuild: orderBuild || 'N/A',
+              checkOrderBuild,
+              orderCompletion: orderCompletion || 'N/A',
+              checkOrderCompletion,
+              tcAssurance: tcAssurance || 'N/A',
+              checkPcsMcpr,
+              billing: billing || 'N/A',
+              customValidations: customValidations.length > 0 ? JSON.stringify(customValidations) : null,
+              status: status || 'PENDING',
+              suiteId
+            }
+          }).then(tc => {
+            updatedCases.push(tc);
+          }).catch(err => {
+            console.error(`Failed to create case:`, err.message);
+          })
+        );
+      }
+    });
+
+    await Promise.all(rowPromises);
+    res.json({ success: true, count: updatedCases.length, testCases: updatedCases });
+
+  } catch (error) {
+    console.error('Excel Sync Error:', error);
     res.status(500).json({ error: error.message });
   }
 });

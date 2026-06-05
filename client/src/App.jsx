@@ -98,6 +98,12 @@ const floatOrb = {
 const App = () => {
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
+  const selectedProjectIdRef = useRef(selectedProjectId);
+
+  useEffect(() => {
+    selectedProjectIdRef.current = selectedProjectId;
+  }, [selectedProjectId]);
+
   const [stats, setStats] = useState({ total: 0, passed: 0, failed: 0, blocked: 0, pending: 0 });
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -270,6 +276,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/defects?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       setDefects(res.data);
     } catch (err) {
       console.error('Fetch Defects Error:', err);
@@ -408,6 +415,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/test-cases/unassigned?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       setUnassignedCases(res.data);
     } catch (err) {
       console.error('Fetch unassigned failed', err);
@@ -574,6 +582,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/test-cases/stats?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       setStats(res.data);
     } catch (err) {
       console.error('Stats error', err);
@@ -585,6 +594,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/insights?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       setInsights(res.data);
       setLoading(false);
     } catch (err) {
@@ -818,6 +828,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/test-cases?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       setAllTestCases(res.data);
 
       if (user) {
@@ -831,31 +842,40 @@ const App = () => {
             drafts = [];
           }
         }
-        if (drafts.length === 0 && res.data.length > 0) {
-          const mappedCases = res.data.map(tc => {
-            let customVal = null;
-            if (tc.customValidations) {
-              try {
-                customVal = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
-              } catch (e) {
-                customVal = tc.customValidations;
-              }
+        
+        const mappedCases = res.data.map(tc => {
+          let customVal = null;
+          if (tc.customValidations) {
+            try {
+              customVal = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+            } catch (e) {
+              customVal = tc.customValidations;
             }
-            return {
-              summary: tc.summary,
-              steps: tc.steps,
-              expectedResult: tc.expectedResult,
-              priority: tc.priority,
-              module: tc.module || '',
-              orderBuild: tc.orderBuild || '',
-              orderCompletion: tc.orderCompletion || '',
-              tcAssurance: tc.tcAssurance || '',
-              billing: tc.billing || '',
-              customValidations: customVal
-            };
-          });
-          setGeneratedScenarios(mappedCases);
-        }
+          }
+          return {
+            id: tc.id,
+            status: tc.status,
+            checkUi: tc.checkUi,
+            checkOrderBuild: tc.checkOrderBuild,
+            checkOrderCompletion: tc.checkOrderCompletion,
+            checkPcsMcpr: tc.checkPcsMcpr,
+            summary: tc.summary,
+            steps: tc.steps,
+            expectedResult: tc.expectedResult,
+            priority: tc.priority,
+            module: tc.module || '',
+            orderBuild: tc.orderBuild || '',
+            orderCompletion: tc.orderCompletion || '',
+            tcAssurance: tc.tcAssurance || '',
+            billing: tc.billing || '',
+            customValidations: customVal
+          };
+        });
+
+        const uncommittedDrafts = drafts.filter(d => !d.id && !mappedCases.some(mc => mc.summary === d.summary));
+        const mergedScenarios = [...mappedCases, ...uncommittedDrafts];
+
+        setGeneratedScenarios(mergedScenarios);
       }
     } catch (err) {
       console.error('Fetch all cases error', err);
@@ -867,6 +887,7 @@ const App = () => {
     if (!id) return;
     try {
       const res = await axios.get(`${API_BASE}/test-cases/burndown?projectId=${id}`);
+      if (id !== selectedProjectIdRef.current) return;
       if (res.data && res.data.data) {
         setBurndownData(res.data.data);
         setBurndownMeta(res.data.meta);
@@ -923,6 +944,85 @@ const App = () => {
       console.error('PPT Export Error:', err);
       const msg = err.response?.data?.error || err.message || 'Unknown error';
       alert(`Failed to export report: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSyncExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Reset file input
+    e.target.value = '';
+
+    if (!selectedProjectId) {
+      alert("Please select a project first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', selectedProjectId);
+
+    try {
+      setLoading(true);
+      setAgentLogs(prev => [...prev, 'System: Synchronizing project database with Excel...']);
+
+      const res = await axios.post(`${API_BASE}/test-cases/sync`, formData);
+
+      if (res.data.success) {
+        setAgentLogs(prev => [...prev, `System: Successfully synchronized ${res.data.count} journeys from Excel.`]);
+
+        // Force update Scenario Lab drafts state & localStorage
+        const mappedCases = res.data.testCases.map(tc => {
+          let customVal = null;
+          if (tc.customValidations) {
+            try {
+              customVal = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+            } catch (err) {
+              customVal = tc.customValidations;
+            }
+          }
+          return {
+            id: tc.id,
+            status: tc.status,
+            checkUi: tc.checkUi,
+            checkOrderBuild: tc.checkOrderBuild,
+            checkOrderCompletion: tc.checkOrderCompletion,
+            checkPcsMcpr: tc.checkPcsMcpr,
+            summary: tc.summary,
+            steps: tc.steps,
+            expectedResult: tc.expectedResult,
+            priority: tc.priority,
+            module: tc.module || '',
+            orderBuild: tc.orderBuild || '',
+            orderCompletion: tc.orderCompletion || '',
+            tcAssurance: tc.tcAssurance || '',
+            billing: tc.billing || '',
+            customValidations: customVal
+          };
+        });
+
+        if (user) {
+          localStorage.setItem(`nexus_drafts_${user.id}_${selectedProjectId}`, JSON.stringify(mappedCases));
+        }
+        setGeneratedScenarios(mappedCases);
+
+        await fetchStats(selectedProjectId);
+        await fetchInsights(selectedProjectId);
+        await fetchUnassigned(selectedProjectId);
+        await fetchAllTestCases(selectedProjectId);
+        await fetchBurndown(selectedProjectId);
+        await fetchDefects(selectedProjectId);
+
+        alert(`Sync complete! ${res.data.count} journeys updated. Generating status report...`);
+        await handleExportPPT();
+      }
+    } catch (err) {
+      console.error('Excel sync failed', err);
+      const msg = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to sync from Excel: ${msg}`);
     } finally {
       setLoading(false);
     }
@@ -1114,7 +1214,15 @@ const App = () => {
 
   const handleCommitScenarios = async () => {
     if (!selectedProjectId || generatedScenarios.length === 0) return;
-    if (!window.confirm(`Save ${generatedScenarios.length} scenarios to ${selectedProject?.name || 'the project'}?`)) return;
+
+    // Filter to only send new drafts (scenarios without a database id)
+    const uncommittedScenarios = generatedScenarios.filter(s => !s.id);
+    if (uncommittedScenarios.length === 0) {
+      alert("All scenarios in this draft are already committed to the project.");
+      return;
+    }
+
+    if (!window.confirm(`Save ${uncommittedScenarios.length} new scenarios to ${selectedProject?.name || 'the project'}?`)) return;
 
     try {
       setLoading(true);
@@ -1122,15 +1230,59 @@ const App = () => {
       const suiteName = 'AI Generated - ' + new Date().toLocaleDateString();
       
       // We'll reuse the upload-style logic but for JSON
-      await axios.post(`${API_BASE}/test-cases/bulk`, {
+      const res = await axios.post(`${API_BASE}/test-cases/bulk`, {
         projectId: selectedProjectId,
         suiteName,
-        testCases: generatedScenarios
+        testCases: uncommittedScenarios
       });
 
       alert('Scenarios saved to project!');
-      fetchStats();
-      fetchAllTestCases();
+
+      if (res.data && res.data.testCases) {
+        const newlyCommittedMapped = res.data.testCases.map(tc => {
+          let customVal = null;
+          if (tc.customValidations) {
+            try {
+              customVal = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+            } catch (err) {
+              customVal = tc.customValidations;
+            }
+          }
+          return {
+            id: tc.id,
+            status: tc.status,
+            checkUi: tc.checkUi,
+            checkOrderBuild: tc.checkOrderBuild,
+            checkOrderCompletion: tc.checkOrderCompletion,
+            checkPcsMcpr: tc.checkPcsMcpr,
+            summary: tc.summary,
+            steps: tc.steps,
+            expectedResult: tc.expectedResult,
+            priority: tc.priority,
+            module: tc.module || '',
+            orderBuild: tc.orderBuild || '',
+            orderCompletion: tc.orderCompletion || '',
+            tcAssurance: tc.tcAssurance || '',
+            billing: tc.billing || '',
+            customValidations: customVal
+          };
+        });
+
+        // Merge newly committed cases in-place
+        const updatedScenarios = generatedScenarios.map(s => {
+          if (s.id) return s;
+          const matching = newlyCommittedMapped.find(nc => nc.summary === s.summary);
+          return matching || s;
+        });
+
+        setGeneratedScenarios(updatedScenarios);
+        if (user) {
+          localStorage.setItem(`nexus_drafts_${user.id}_${selectedProjectId}`, JSON.stringify(updatedScenarios));
+        }
+      }
+
+      await fetchStats(selectedProjectId);
+      await fetchAllTestCases(selectedProjectId);
     } catch (err) {
       console.error('Commit failed', err);
       const msg = err.response?.data?.error || err.message || 'Unknown error';
@@ -1259,9 +1411,25 @@ const App = () => {
         };
       });
       setAgentLogs(prev => [...prev, `System: Validation points synced to all ${generatedScenarios.length} scenarios.`]);
+
+      // Database sync for any database-backed scenarios
+      const dbUpdates = updated
+        .filter(s => s.id)
+        .map(s => axios.patch(`${API_BASE}/test-cases/${s.id}`, s));
+      if (dbUpdates.length > 0) {
+        Promise.all(dbUpdates)
+          .then(() => fetchAllTestCases())
+          .catch(err => console.error("Database sync failed", err));
+      }
     } else {
       updated = [...generatedScenarios];
       updated[editingScenarioIndex] = savedScenario;
+
+      if (savedScenario.id) {
+        axios.patch(`${API_BASE}/test-cases/${savedScenario.id}`, savedScenario)
+          .then(() => fetchAllTestCases())
+          .catch(err => console.error("Database sync failed", err));
+      }
     }
     
     setGeneratedScenarios(updated);
@@ -1332,6 +1500,16 @@ const App = () => {
     setEditingScenarioData(null);
     
     setAgentLogs(prev => [...prev, `AI Agent: Bulk Synchronisation applied to ${count} journeys.`]);
+
+    // Database sync for any database-backed scenarios
+    const dbUpdates = updated
+      .filter(s => s.id)
+      .map(s => axios.patch(`${API_BASE}/test-cases/${s.id}`, s));
+    if (dbUpdates.length > 0) {
+      Promise.all(dbUpdates)
+        .then(() => fetchAllTestCases())
+        .catch(err => console.error("Database sync failed", err));
+    }
   };
 
   // Scroll to results when scenarios are generated
@@ -1451,6 +1629,11 @@ const App = () => {
               <Upload className="w-4 h-4 rotate-180" />
               Export Report
             </button>
+            <label className={`flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-emerald-600/20 cursor-pointer`}>
+              <Upload className="w-4 h-4" />
+              Sync & Report from Excel
+              <input type="file" className="hidden" onChange={handleSyncExcel} accept=".xlsx,.xls" />
+            </label>
             <button 
               onClick={handleResetProject}
               className={`flex items-center gap-2 px-5 py-2.5 bg-red-600/10 text-red-500 border border-red-500/20 rounded-xl font-semibold hover:bg-red-600/20 transition-all shadow-sm`}
