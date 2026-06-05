@@ -51,7 +51,7 @@ router.get('/project/:id/ppt', async (req, res) => {
     s1.background = { color: "020617" }; // Stealth Black
     s1.addShape(pres.ShapeType.rect, { x: 0, y: 0, w: '100%', h: 0.1, fill: { color: "6366F1" } }); // Indigo Top Accent
     
-    s1.addText("EXECUTIVE QUALITY INSIGHTS", { 
+    s1.addText("CJT EXECUTION INSIGHTS", { 
       x: 0.5, y: 1.0, w: "90%", fontSize: 14, color: "6366F1", bold: true, charSpacing: 4, fontFace: "Arial"
     });
     s1.addText(project.name.toUpperCase(), { 
