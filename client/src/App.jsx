@@ -8,7 +8,7 @@ import {
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { 
   Activity, CheckCircle2, AlertCircle, Clock, 
-  Upload, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
+  Upload, Download, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
   ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard, Shield, HelpCircle, Info
 } from 'lucide-react';
 import { io } from 'socket.io-client';
@@ -575,6 +575,78 @@ const App = () => {
       console.error('Delete Defect Error:', err);
     }
   };
+
+  const handleExportDefects = async () => {
+    if (!selectedProjectId) return;
+    try {
+      setLoading(true);
+      setAgentLogs(prev => [...prev, 'System: Generating defects Excel report...']);
+      
+      const res = await axios.get(`${API_BASE}/defects/export`, {
+        params: { projectId: selectedProjectId },
+        responseType: 'blob'
+      });
+
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      const fileName = `${(selectedProject?.name || 'Test_Nexus').replace(/[^a-z0-9]/gi, '_')}_Defects.xlsx`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+
+      setAgentLogs(prev => [...prev, 'System: Defects Excel report downloaded successfully.']);
+    } catch (err) {
+      console.error('Defects Export Error:', err);
+      alert('Failed to export defects list to Excel.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleImportDefects = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Reset file input
+    e.target.value = '';
+
+    if (!selectedProjectId) {
+      alert("Please select a project first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', selectedProjectId);
+
+    try {
+      setLoading(true);
+      setAgentLogs(prev => [...prev, 'System: Synchronizing defects database with Excel...']);
+
+      const res = await axios.post(`${API_BASE}/defects/import`, formData);
+
+      if (res.data.success) {
+        setAgentLogs(prev => [...prev, `System: Successfully synchronized ${res.data.count} defects from Excel.`]);
+        await fetchDefects(selectedProjectId);
+        alert(`Sync complete! ${res.data.count} defects processed successfully.`);
+      }
+    } catch (err) {
+      console.error('Defects Sync Error:', err);
+      const msg = err.response?.data?.error || err.message || 'Unknown error';
+      alert(`Failed to import defects: ${msg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
 
   const fetchStats = async (projectIdOverride) => {
@@ -2209,21 +2281,47 @@ const App = () => {
                         <option value="P4">P4</option>
                       </select>
                     </h4>
-                    <button 
-                      onClick={() => {
-                        setEditingDefectId(null);
-                        setNewDefectData({
-                          externalId: '', title: '', severity: 'P2', owner: '', actionPlan: '', 
-                          description: '', futImpact: '', relatedCaseId: '', blockedCases: '',
-                          raisedAt: new Date().toISOString().split('T')[0]
-                        });
-                        setIsDefectModalOpen(true);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500/20 transition-all"
-                    >
-                      <Plus size={12} />
-                      Report Blocker
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={handleExportDefects}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-blue-500/10 ${isDark ? 'text-blue-400' : 'text-blue-600'} rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-blue-500/20 transition-all`}
+                        title="Export Blockers to Excel"
+                      >
+                        <Download size={12} />
+                        Export
+                      </button>
+                      
+                      <label 
+                        className={`flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/10 ${isDark ? 'text-emerald-400' : 'text-emerald-600'} rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-emerald-500/20 transition-all cursor-pointer`}
+                        title="Import Blockers from Excel"
+                      >
+                        <Upload size={12} />
+                        Import
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          onChange={handleImportDefects} 
+                          accept=".xlsx,.xls" 
+                        />
+                      </label>
+
+                      <button 
+                        onClick={() => {
+                          setEditingDefectId(null);
+                          setNewDefectData({
+                            externalId: '', title: '', severity: 'P2', owner: '', actionPlan: '', 
+                            description: '', futImpact: '', relatedCaseId: '', blockedCases: '',
+                            raisedAt: new Date().toISOString().split('T')[0]
+                          });
+                          setIsDefectModalOpen(true);
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-500/10 text-rose-500 rounded-xl text-[10px] font-bold uppercase tracking-widest hover:bg-rose-500/20 transition-all"
+                      >
+                        <Plus size={12} />
+                        Report Blocker
+                      </button>
+                    </div>
+
                   </div>
                   <div className="space-y-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
                     {defects.filter(d => defectFilter === 'ALL' || d.severity === defectFilter).length > 0 ? (
