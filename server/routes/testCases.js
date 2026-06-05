@@ -1042,16 +1042,19 @@ router.post('/sync', upload.single('file'), async (req, res) => {
       const module = getValByHeader(row, 'Module');
       const steps = getValByHeader(row, 'Test Steps');
       const expectedResult = getValByHeader(row, 'Expected Outcome');
-      const checkUi = getValByHeader(row, 'UI Valid Status') === 'PASS';
+      const checkUi = String(getValByHeader(row, 'UI Valid Status')).toUpperCase().trim() === 'PASS';
       const orderBuild = getValByHeader(row, 'Order Build Detail');
-      const checkOrderBuild = getValByHeader(row, 'Order Build Status') === 'PASS';
+      const checkOrderBuild = String(getValByHeader(row, 'Order Build Status')).toUpperCase().trim() === 'PASS';
       const orderCompletion = getValByHeader(row, 'Completion Detail');
-      const checkOrderCompletion = getValByHeader(row, 'Completion Status') === 'PASS';
+      const checkOrderCompletion = String(getValByHeader(row, 'Completion Status')).toUpperCase().trim() === 'PASS';
       const tcAssurance = getValByHeader(row, 'T&C / Comms Detail');
-      const checkPcsMcpr = getValByHeader(row, 'T&C / Comms Status') === 'PASS';
+      const checkPcsMcpr = String(getValByHeader(row, 'T&C / Comms Status')).toUpperCase().trim() === 'PASS';
       const billing = getValByHeader(row, 'Billing Detail');
-      const checkBilling = getValByHeader(row, 'Billing Status') === 'PASS';
-      const status = getValByHeader(row, 'OVERALL JOURNEY STATUS') || 'PENDING';
+      const checkBilling = String(getValByHeader(row, 'Billing Status')).toUpperCase().trim() === 'PASS';
+      let status = String(getValByHeader(row, 'OVERALL JOURNEY STATUS')).toUpperCase().trim() || 'PENDING';
+      if (!['PENDING', 'IN PROGRESS', 'PASS', 'FAIL', 'BLOCKED'].includes(status)) {
+        status = 'PENDING';
+      }
 
       // Parse custom validations
       const customValidations = [];
@@ -1079,7 +1082,7 @@ router.post('/sync', upload.single('file'), async (req, res) => {
           const statusIdx = headers.indexOf(statusHeader);
           let checked = false;
           if (statusIdx !== -1) {
-            checked = getCellValue(row.getCell(statusIdx)) === 'PASS';
+            checked = String(getCellValue(row.getCell(statusIdx))).toUpperCase().trim() === 'PASS';
           }
           if (detailValue && detailValue !== 'N/A') {
             customValidations.push({
