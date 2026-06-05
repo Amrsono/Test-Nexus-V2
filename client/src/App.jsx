@@ -469,6 +469,15 @@ const App = () => {
     try {
       setLoading(true);
       await axios.post(`${API_BASE}/projects/${selectedProjectId}/reset`);
+      
+      // Clear drafts and requirements state and localStorage
+      setGeneratedScenarios([]);
+      setLabRequirements('');
+      if (user) {
+        localStorage.removeItem(`nexus_drafts_${user.id}_${selectedProjectId}`);
+        localStorage.removeItem(`nexus_lab_reqs_${user.id}_${selectedProjectId}`);
+      }
+
       await fetchStats();
       await fetchInsights();
       await fetchUnassigned();
@@ -810,6 +819,44 @@ const App = () => {
     try {
       const res = await axios.get(`${API_BASE}/test-cases?projectId=${id}`);
       setAllTestCases(res.data);
+
+      if (user) {
+        const draftKey = `nexus_drafts_${user.id}_${id}`;
+        const savedDrafts = localStorage.getItem(draftKey);
+        let drafts = [];
+        if (savedDrafts) {
+          try {
+            drafts = JSON.parse(savedDrafts);
+          } catch (e) {
+            drafts = [];
+          }
+        }
+        if (drafts.length === 0 && res.data.length > 0) {
+          const mappedCases = res.data.map(tc => {
+            let customVal = null;
+            if (tc.customValidations) {
+              try {
+                customVal = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+              } catch (e) {
+                customVal = tc.customValidations;
+              }
+            }
+            return {
+              summary: tc.summary,
+              steps: tc.steps,
+              expectedResult: tc.expectedResult,
+              priority: tc.priority,
+              module: tc.module || '',
+              orderBuild: tc.orderBuild || '',
+              orderCompletion: tc.orderCompletion || '',
+              tcAssurance: tc.tcAssurance || '',
+              billing: tc.billing || '',
+              customValidations: customVal
+            };
+          });
+          setGeneratedScenarios(mappedCases);
+        }
+      }
     } catch (err) {
       console.error('Fetch all cases error', err);
     }
