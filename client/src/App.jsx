@@ -111,6 +111,7 @@ const App = () => {
   const [isEditScenarioModalOpen, setIsEditScenarioModalOpen] = useState(false);
   const [editingScenarioIndex, setEditingScenarioIndex] = useState(null);
   const [editingScenarioData, setEditingScenarioData] = useState(null);
+  const [originalScenarioSnapshot, setOriginalScenarioSnapshot] = useState(null);
   const [unassignedCases, setUnassignedCases] = useState([]);
   const [testers, setTesters] = useState([]);
   const [selectedTesterId, setSelectedTesterId] = useState('');
@@ -1413,10 +1414,10 @@ const App = () => {
       }
     }
 
-    setEditingScenarioData({ 
-      ...scenario, 
-      validationPoints 
-    });
+    const editData = { ...scenario, validationPoints };
+    setEditingScenarioData(editData);
+    // Snapshot the original state so we can diff later for "Sync to All"
+    setOriginalScenarioSnapshot({ ...scenario, validationPoints });
     setIsEditScenarioModalOpen(true);
   };
 
@@ -1515,17 +1516,15 @@ const App = () => {
     if (editingScenarioIndex === null || !editingScenarioData) return;
     
     const count = generatedScenarios.length;
-    if (!window.confirm(`Master Sync: This will apply these steps, outcomes, and settings to ALL ${count} journeys in your current draft. Unique titles will be preserved. Proceed?`)) return;
 
-    // Serialize validationPoints back to standard fields and customValidations
-    const serialized = (() => {
+    // --- Serialize current validationPoints to flat fields ---
+    const serializeValidationPoints = (validationPoints) => {
       let orderBuild = null;
       let orderCompletion = null;
       let tcAssurance = null;
       let billing = null;
       const customValidations = [];
-
-      (editingScenarioData.validationPoints || []).forEach(vp => {
+      (validationPoints || []).forEach(vp => {
         const labelLower = (vp.label || '').toLowerCase();
         if (vp.id === 'orderBuild' || labelLower === 'order build' || labelLower === 'order build / pricing') {
           orderBuild = vp.value || null;
@@ -1536,42 +1535,65 @@ const App = () => {
         } else if (vp.id === 'billing' || labelLower === 'billing' || labelLower === 'billing expectations') {
           billing = vp.value || null;
         } else {
-          customValidations.push({
-            id: vp.id,
-            label: vp.label,
-            value: vp.value,
-            checked: vp.checked || false
-          });
+          customValidations.push({ id: vp.id, label: vp.label, value: vp.value, checked: vp.checked || false });
         }
       });
+      return { orderBuild, orderCompletion, tcAssurance, billing, customValidations: customValidations.length > 0 ? customValidations : null };
+    };
 
-      return {
-        orderBuild,
-        orderCompletion,
-        tcAssurance,
-        billing,
-        customValidations: customValidations.length > 0 ? customValidations : null
-      };
-    })();
+    const newSerialized = serializeValidationPoints(editingScenarioData.validationPoints);
+    const origSerialized = serializeValidationPoints(originalScenarioSnapshot?.validationPoints);
 
-    const { summary, ...sharedData } = editingScenarioData;
-    delete sharedData.validationPoints;
-    
-    const updated = generatedScenarios.map((s, i) => {
-      if (i === editingScenarioIndex) return { ...editingScenarioData, ...serialized };
-      return { 
-        ...s, 
-        ...sharedData,
-        ...serialized
-      };
+    // --- Diff: figure out exactly which fields the user changed ---
+    const simpleFields = ['summary', 'steps', 'expectedResult', 'module', 'priority'];
+    const validationFields = ['orderBuild', 'orderCompletion', 'tcAssurance', 'billing', 'customValidations'];
+
+    const changedSimple = {};
+    simpleFields.forEach(field => {
+      const oldVal = originalScenarioSnapshot?.[field] ?? null;
+      const newVal = editingScenarioData[field] ?? null;
+      if (oldVal !== newVal) changedSimple[field] = newVal;
     });
-    
+
+    const changedValidation = {};
+    validationFields.forEach(field => {
+      const oldVal = JSON.stringify(origSerialized[field] ?? null);
+      const newVal = JSON.stringify(newSerialized[field] ?? null);
+      if (oldVal !== newVal) changedValidation[field] = newSerialized[field];
+    });
+
+    const totalChangedFields = Object.keys(changedSimple).length + Object.keys(changedValidation).length;
+    if (totalChangedFields === 0) {
+      alert('No changes detected to sync.');
+      return;
+    }
+
+    const changedLabels = [
+      ...Object.keys(changedSimple).map(f => ({ summary: 'Title', steps: 'Test Steps', expectedResult: 'Expected Result', module: 'Module', priority: 'Priority' }[f] || f)),
+      ...(Object.keys(changedValidation).length > 0 ? ['Validation Points'] : [])
+    ];
+
+    if (!window.confirm(`Apply to All: The following change(s) will be synced to all ${count} scenarios:\n\n• ${changedLabels.join('\n• ')}\n\nEverything else in each scenario stays untouched. Proceed?`)) return;
+
+    // --- Build the fully saved version of the scenario being edited ---
+    const savedScenario = { ...editingScenarioData, ...newSerialized };
+    delete savedScenario.validationPoints; // clean temporary UI field
+
+    // --- Apply only the changed fields to every other scenario ---
+    const patchForOthers = { ...changedSimple, ...changedValidation };
+
+    const updated = generatedScenarios.map((s, i) => {
+      if (i === editingScenarioIndex) return savedScenario;
+      return { ...s, ...patchForOthers };
+    });
+
     setGeneratedScenarios(updated);
     setIsEditScenarioModalOpen(false);
     setEditingScenarioIndex(null);
     setEditingScenarioData(null);
-    
-    setAgentLogs(prev => [...prev, `AI Agent: Bulk Synchronisation applied to ${count} journeys.`]);
+    setOriginalScenarioSnapshot(null);
+
+    setAgentLogs(prev => [...prev, `System: Synced [${changedLabels.join(', ')}] to all ${count} scenarios.`]);
 
     // Database sync for any database-backed scenarios
     const dbUpdates = updated
