@@ -1,7 +1,9 @@
 import React from 'react';
 import { Mail, GitBranch, Info, Shield, Zap, Globe } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 const AboutScreen = ({ isDark }) => {
+  const { t } = useTranslation();
   const textColor = isDark ? 'text-white' : 'text-slate-900';
   const subTextColor = isDark ? 'text-slate-400' : 'text-slate-500';
   const cardBg = isDark ? 'bg-white/5 border border-white/10' : 'bg-white border-2 border-slate-400 shadow-md';
@@ -14,39 +16,39 @@ const AboutScreen = ({ isDark }) => {
             <Info size={32} className="text-primary" />
           </div>
           <div>
-            <h2 className={`text-3xl font-extrabold ${textColor}`}>About Test Nexus</h2>
-            <p className={`${subTextColor}`}>Version 2.4.0</p>
+            <h2 className={`text-3xl font-extrabold ${textColor}`}>{t('aboutTitle')}</h2>
+            <p className={`${subTextColor}`}>{t('version')}</p>
           </div>
         </div>
 
         <div className={`prose ${isDark ? 'prose-invert' : ''} max-w-none mb-8`}>
           <p className={`text-lg leading-relaxed ${textColor}`}>
-            Test Nexus is a next-generation test management and quality assurance platform designed for modern engineering teams. 
-            By combining AI-driven scenario generation with real-time analytics and seamless execution tracking, Test Nexus accelerates 
-            delivery cycles while ensuring uncompromising product quality.
+            {t('aboutDescription')}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-          <div className={`p-5 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-slate-50'}`}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className={`p-6 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
             <Zap className="text-amber-500 mb-3" size={24} />
-            <h3 className={`font-bold ${textColor} mb-2`}>Lightning Fast</h3>
-            <p className={`text-xs ${subTextColor}`}>Optimized for speed with a reactive architecture.</p>
+            <h4 className={`font-bold ${textColor} mb-1`}>{t('lightningFast')}</h4>
+            <p className={`text-xs ${subTextColor}`}>{t('lightningFastDesc')}</p>
           </div>
-          <div className={`p-5 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-slate-50'}`}>
-            <Shield className="text-emerald-500 mb-3" size={24} />
-            <h3 className={`font-bold ${textColor} mb-2`}>Enterprise Grade</h3>
-            <p className={`text-xs ${subTextColor}`}>Built with security and scalability at its core.</p>
+          
+          <div className={`p-6 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+            <Shield className="text-blue-500 mb-3" size={24} />
+            <h4 className={`font-bold ${textColor} mb-1`}>{t('enterpriseGrade')}</h4>
+            <p className={`text-xs ${subTextColor}`}>{t('enterpriseGradeDesc')}</p>
           </div>
-          <div className={`p-5 rounded-2xl ${isDark ? 'bg-black/20' : 'bg-slate-50'}`}>
-            <Globe className="text-blue-500 mb-3" size={24} />
-            <h3 className={`font-bold ${textColor} mb-2`}>Collaborative</h3>
-            <p className={`text-xs ${subTextColor}`}>Real-time sync keeps your whole team aligned.</p>
+          
+          <div className={`p-6 rounded-2xl border ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+            <Globe className="text-emerald-500 mb-3" size={24} />
+            <h4 className={`font-bold ${textColor} mb-1`}>{t('collaborative')}</h4>
+            <p className={`text-xs ${subTextColor}`}>{t('collaborativeDesc')}</p>
           </div>
         </div>
 
         <div className={`border-t ${isDark ? 'border-white/10' : 'border-slate-200'} pt-8`}>
-          <h3 className={`text-xl font-bold ${textColor} mb-6`}>Developer Contact</h3>
+          <h3 className={`text-xl font-bold ${textColor} mb-6`}>{t('developerContact')}</h3>
           
           <div className="flex flex-col sm:flex-row gap-4">
             <a 

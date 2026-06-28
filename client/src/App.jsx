@@ -18,6 +18,8 @@ import SubscriptionScreen from './components/SubscriptionScreen';
 import AdminDashboard from './components/AdminDashboard';
 import HelpScreen from './components/HelpScreen';
 import AboutScreen from './components/AboutScreen';
+import { useTranslation } from './i18n';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
@@ -96,6 +98,7 @@ const floatOrb = {
 };
 
 const App = () => {
+  const { t } = useTranslation();
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState(null);
   const selectedProjectIdRef = useRef(selectedProjectId);
@@ -1695,25 +1698,26 @@ const App = () => {
                 />
               ))}
             </div>
+            <LanguageSwitcher isDark={isDark} />
             <div className={`flex items-center gap-3 px-4 py-2 rounded-xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100'} border ${isPremium ? 'border-emerald-500/30' : ''}`}>
               <div className="flex flex-col items-end">
                 <span className={`text-[10px] font-bold ${textColor}`}>{user.name}</span>
                 <span className={`text-[8px] font-black uppercase tracking-widest ${user.role === 'ADMIN' ? 'text-primary' : isPremium ? 'text-emerald-400' : 'text-slate-500'}`}>
-                  {user.role}{isPremium && <span className="ml-1 inline-flex items-center gap-0.5">· <span className="text-emerald-400">★ PREMIUM</span></span>}{isTrial && <span className="text-amber-500 ml-1">(TRIAL)</span>}
+                  {user.role}{isPremium && <span className="ml-1 inline-flex items-center gap-0.5">· <span className="text-emerald-400">★ {t('premium')}</span></span>}{isTrial && <span className="text-amber-500 ml-1">({t('trial')})</span>}
                 </span>
               </div>
               <button 
                 onClick={handleLogout}
                 className="p-1.5 hover:bg-red-500/10 rounded-lg text-slate-500 hover:text-red-500 transition-all"
-                title="Logout"
+                title={t('logout')}
               >
                 <Lock size={16} />
               </button>
             </div>
-            <button 
+             <button 
               onClick={(e) => {
                 if (!canImportFull) {
-                  alert('Trial Restriction: Exporting/Generating full reports is only available for premium subscribers (£100/mo). Upgrade to unlock.');
+                  alert(t('trialRestrictionReport'));
                 } else {
                   handleExportPPT();
                 }
@@ -1721,11 +1725,11 @@ const App = () => {
               className={`flex items-center gap-2 px-5 py-2.5 ${canImportFull ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-slate-400 opacity-50 cursor-not-allowed'} text-white rounded-xl font-semibold transition-all shadow-lg shadow-indigo-600/20`}
             >
               <Upload className="w-4 h-4 rotate-180" />
-              Export Report
+              {t('exportReport')}
             </button>
             <label className={`flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-semibold transition-all shadow-lg shadow-emerald-600/20 cursor-pointer`}>
               <Upload className="w-4 h-4" />
-              Sync & Report from Excel
+              {t('syncReport')}
               <input type="file" className="hidden" onChange={handleSyncExcel} accept=".xlsx,.xls" />
             </label>
             <button 
@@ -1734,12 +1738,12 @@ const App = () => {
               title={`Master Reset: Delete all scenarios for ${selectedProject?.name || 'this project'}`}
             >
               <AlertCircle size={18} />
-              Reset {selectedProject?.name ? `(${selectedProject.name})` : ''}
+              {t('reset')} {selectedProject?.name ? `(${selectedProject.name})` : ''}
             </button>
             <div className="flex gap-2">
               <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
                 <Plus size={18} />
-                Background
+                {t('background')}
                 <input type="file" className="hidden" onChange={handleBackgroundUpload} accept="image/*" />
               </label>
               {selectedProject?.backgroundUrl && (
@@ -1755,7 +1759,7 @@ const App = () => {
             <div className="flex gap-2">
               <label className={`flex items-center gap-2 px-5 py-2.5 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-xl font-semibold hover:opacity-80 transition-all shadow-sm cursor-pointer`}>
                 <Plus size={18} />
-                Logo
+                {t('logo')}
                 <input type="file" className="hidden" onChange={handleLogoUpload} accept="image/*" />
               </label>
               {selectedProject?.logoUrl && (
@@ -1773,12 +1777,12 @@ const App = () => {
               onClick={(e) => {
                 if (!canImportFull) {
                   e.preventDefault();
-                  alert('Trial Restriction: Importing reports or sheets is only available for premium subscribers (£100/mo). Upgrade to unlock.');
+                  alert(t('trialRestrictionImport'));
                 }
               }}
             >
               <Upload size={18} />
-              Import
+              {t('import')}
               {canImportFull && <input type="file" className="hidden" onChange={handleUpload} accept=".xlsx,.xls,.csv" />}
             </label>
           </div>
@@ -1846,7 +1850,7 @@ const App = () => {
               : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
             }`}
           >
-            Dashboard
+            {t('dashboard')}
             {currentView === 'dashboard' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
           <button 
@@ -1858,7 +1862,7 @@ const App = () => {
             }`}
           >
             <Brain size={16} />
-            Scenario Lab
+            {t('scenarioLab')}
             {currentView === 'lab' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
           <button 
@@ -1870,7 +1874,7 @@ const App = () => {
             }`}
           >
             <CreditCard size={16} />
-            Billing
+            {t('billing')}
             {currentView === 'billing' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
           {user.role === 'ADMIN' && (
@@ -1883,7 +1887,7 @@ const App = () => {
               }`}
             >
               <Shield size={16} />
-              System Admin
+              {t('systemAdmin')}
               {currentView === 'admin' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
             </button>
           )}
@@ -1896,7 +1900,7 @@ const App = () => {
             }`}
           >
             <HelpCircle size={16} />
-            Help
+            {t('help')}
             {currentView === 'help' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
           <button 
@@ -1908,7 +1912,7 @@ const App = () => {
             }`}
           >
             <Info size={16} />
-            About
+            {t('about')}
             {currentView === 'about' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
           </button>
         </div>

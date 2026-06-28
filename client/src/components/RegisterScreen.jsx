@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Sparkles, CheckCircle2, Shield, Mail, User, Lock, ArrowRight } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
 const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,10 +37,10 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
         <div className="hidden md:block space-y-8 p-8">
           <div className="space-y-4">
             <h2 className="text-4xl font-bold text-white leading-tight">
-              Unlock the Full Power of <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Test Nexus</span>
+              {t('unlockPower')} <span className="bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Test Nexus</span>
             </h2>
             <p className="text-slate-400 text-lg leading-relaxed">
-              Experience professional test management with AI-driven insights and automated reporting.
+              {t('registerSubtitle')}
             </p>
           </div>
 
@@ -48,8 +50,8 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-white font-semibold">3-Day Free Trial</h4>
-                <p className="text-slate-400 text-sm">Full access to all AI features and dashboard tools immediately.</p>
+                <h4 className="text-white font-semibold">{t('trialFeatureTitle')}</h4>
+                <p className="text-slate-400 text-sm">{t('trialFeatureDesc')}</p>
               </div>
             </div>
 
@@ -58,8 +60,8 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-white font-semibold">Premium Features</h4>
-                <p className="text-slate-400 text-sm">£100/month after trial to unlock Excel/PPT imports and reports.</p>
+                <h4 className="text-white font-semibold">{t('premiumFeatureTitle')}</h4>
+                <p className="text-slate-400 text-sm">{t('premiumFeatureDesc')}</p>
               </div>
             </div>
           </div>
@@ -68,11 +70,11 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
         {/* Right Side: Form */}
         <div className="glass rounded-3xl p-8 shadow-2xl border border-white/10">
           <div className="text-center mb-8 md:hidden">
-             <h1 className="text-2xl font-bold text-white">Start Your Trial</h1>
+             <h1 className="text-2xl font-bold text-white">{t('registerTitle')}</h1>
           </div>
           
           <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-            Create Account <ArrowRight className="w-4 h-4 text-slate-500" />
+            {t('createAccount')} <ArrowRight className="w-4 h-4 text-slate-500" />
           </h2>
 
           {error && (
@@ -83,13 +85,13 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">Full Name</label>
+              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">{t('fullName')}</label>
               <div className="relative">
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="text"
                   required
-                  placeholder="John Doe"
+                  placeholder={t('fullNamePlaceholder')}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all"
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -98,13 +100,13 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">Email Address</label>
+              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">{t('emailAddress')}</label>
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
                   type="email"
                   required
-                  placeholder="john@company.com"
+                  placeholder={t('emailAddressPlaceholder')}
                   className="w-full bg-slate-900/50 border border-slate-700 rounded-xl py-3 pl-11 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all"
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -113,7 +115,7 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">Password</label>
+              <label className="text-xs font-medium text-slate-400 ml-1 uppercase tracking-wider">{t('passwordLabel')}</label>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
@@ -132,12 +134,12 @@ const RegisterScreen = ({ onRegister, onSwitchToLogin }) => {
               disabled={loading}
               className="w-full bg-blue-600 hover:bg-blue-500 text-white rounded-xl py-3 font-semibold shadow-lg shadow-blue-500/20 transition-all flex items-center justify-center gap-2 mt-4"
             >
-              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Create Free Account'}
+              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : t('createFreeAccount')}
             </button>
           </form>
 
           <div className="mt-8 pt-6 border-t border-white/5 text-center text-sm text-slate-400">
-            <p>Already have an account? <button onClick={onSwitchToLogin} className="text-blue-400 hover:underline">Login</button></p>
+            <p>{t('alreadyHaveAccount')} <button onClick={onSwitchToLogin} className="text-blue-400 hover:underline">{t('login')}</button></p>
           </div>
         </div>
       </div>

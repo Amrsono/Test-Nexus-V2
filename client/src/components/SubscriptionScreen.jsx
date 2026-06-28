@@ -4,11 +4,13 @@ import {
   CreditCard, Smartphone, Globe, CheckCircle2, Clock,
   AlertCircle, ArrowLeft, Send, Sparkles, RefreshCw, Star, ShieldCheck, Zap
 } from 'lucide-react';
+import { useTranslation } from '../i18n';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
 
 const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
+  const { t } = useTranslation();
   const [method, setMethod] = useState(null);
   const [transactionId, setTransactionId] = useState('');
   const [loading, setLoading] = useState(false);
@@ -108,8 +110,8 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
             <CheckCircle2 size={24} className="text-emerald-400" />
           </div>
           <div>
-            <p className="text-emerald-400 font-black text-sm uppercase tracking-widest">Payment Proof Submitted!</p>
-            <p className="text-emerald-500/70 text-xs mt-0.5">Our team will review and approve your subscription within 1–2 hours.</p>
+            <p className="text-emerald-400 font-black text-sm uppercase tracking-widest">{t('paymentProofSubmitted')}</p>
+            <p className="text-emerald-500/70 text-xs mt-0.5">{t('paymentProofDesc')}</p>
           </div>
           <button onClick={() => setSuccess(false)} className="ml-auto text-emerald-500/50 hover:text-emerald-400 transition-colors text-lg leading-none">&times;</button>
         </div>
@@ -119,7 +121,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="flex items-center gap-2 text-slate-500 hover:text-white transition-all group">
           <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-          <span className="font-bold uppercase tracking-widest text-[10px]">Back to Dashboard</span>
+          <span className="font-bold uppercase tracking-widest text-[10px]">{t('backToDashboard')}</span>
         </button>
         <button
           onClick={handleRefreshStatus}
@@ -127,7 +129,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
           className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all text-xs font-bold uppercase tracking-widest disabled:opacity-50"
         >
           <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-          Refresh Status
+          {t('refreshStatus')}
         </button>
       </div>
 
@@ -151,12 +153,12 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
               </div>
               <div>
                 <div className="flex items-center gap-3 mb-1">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Premium Subscription</span>
-                  <span className="px-2 py-0.5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">ACTIVE</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">{t('premiumSubscription')}</span>
+                  <span className="px-2 py-0.5 bg-emerald-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full">{t('active')}</span>
                 </div>
-                <h2 className="text-2xl font-black text-white">All Features Unlocked</h2>
+                <h2 className="text-2xl font-black text-white">{t('allFeaturesUnlocked')}</h2>
                 <p className="text-emerald-400/70 text-sm mt-0.5">
-                  Full access to imports, exports, reports & multi-project management
+                  {t('premiumFeaturesDesc')}
                 </p>
               </div>
             </div>
@@ -165,7 +167,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
               {user.subscriptionExpiresAt && (
                 <>
                   <div className="text-right">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Renews / Expires</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{t('renewsExpires')}</p>
                     <p className="text-sm font-black text-white">{formatDate(user.subscriptionExpiresAt)}</p>
                   </div>
                   <div className={`px-3 py-1.5 rounded-xl text-xs font-black ${
@@ -173,7 +175,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
                       ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                       : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   }`}>
-                    {getDaysRemaining(user.subscriptionExpiresAt)} days remaining
+                    {t('daysRemaining', { count: getDaysRemaining(user.subscriptionExpiresAt) })}
                   </div>
                 </>
               )}
@@ -183,11 +185,11 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
           {/* Feature pills */}
           <div className="relative border-t border-emerald-500/20 px-8 py-4 flex flex-wrap gap-3">
             {[
-              { icon: <Zap size={12} />, label: 'AI Scenario Lab' },
-              { icon: <CheckCircle2 size={12} />, label: 'Bulk Excel Import' },
-              { icon: <ShieldCheck size={12} />, label: 'PDF Reports' },
-              { icon: <Sparkles size={12} />, label: 'Multi-Project' },
-              { icon: <Star size={12} />, label: 'Team Management' },
+              { icon: <Zap size={12} />, label: t('aiScenarioLab') },
+              { icon: <CheckCircle2 size={12} />, label: t('bulkImports') },
+              { icon: <ShieldCheck size={12} />, label: t('execPdfReports') },
+              { icon: <Sparkles size={12} />, label: t('multiProjectAnalytics') },
+              { icon: <Star size={12} />, label: t('teamManagement') },
             ].map(f => (
               <div key={f.label} className="flex items-center gap-1.5 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[10px] font-bold uppercase tracking-wider">
                 {f.icon} {f.label}
@@ -209,12 +211,12 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
           </div>
           <div>
             <p className={`font-black text-sm uppercase tracking-widest ${isTrial ? 'text-amber-400' : 'text-rose-400'}`}>
-              {isTrial ? `Trial Active — Expires ${formatDate(user.trialEndsAt)}` : 'Trial Expired'}
+              {isTrial ? t('trialActive', { date: formatDate(user.trialEndsAt) }) : t('trialExpired')}
             </p>
             <p className="text-slate-500 text-xs mt-0.5">
               {isTrial
-                ? 'Import & export are restricted. Upgrade to unlock all features.'
-                : 'Your trial has ended. Submit a payment below to reactivate.'}
+                ? t('importExportRestricted')
+                : t('trialEndedDesc')}
             </p>
           </div>
           <div className={`ml-auto px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${
@@ -231,21 +233,21 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
           {/* Left: Payment Form */}
           <div className="space-y-6">
             <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl backdrop-blur-xl">
-              <h2 className="text-2xl font-black text-white mb-2">Upgrade to Premium</h2>
-              <p className="text-slate-400 text-sm mb-8">Unlock full automation, bulk imports, and administrative tools.</p>
+              <h2 className="text-2xl font-black text-white mb-2">{t('upgradeToPremium')}</h2>
+              <p className="text-slate-400 text-sm mb-8">{t('unlockFullAutomation')}</p>
 
               <div className="bg-primary/10 border border-primary/20 rounded-3xl p-6 mb-8 relative overflow-hidden">
                 <div className="absolute -top-10 -right-10 w-32 h-32 bg-primary/20 blur-3xl rounded-full" />
                 <div className="relative">
                   <div className="flex items-baseline gap-2 mb-4">
                     <span className="text-4xl font-black text-white">£{settings.SUBSCRIPTION_COST || '100'}</span>
-                    <span className="text-slate-500 font-bold">/ monthly</span>
+                    <span className="text-slate-500 font-bold">{t('monthly')}</span>
                   </div>
                   <ul className="space-y-3">
-                    {['Full AI Scenario Generation', 'Bulk Excel/CSV Imports', 'Executive PDF Reports', 'Multi-Project Analytics', 'Team Management'].map(feature => (
-                      <li key={feature} className="flex items-center gap-3 text-sm text-slate-300">
+                    {['fullAiGeneration', 'bulkImports', 'execPdfReports', 'multiProjectAnalytics', 'teamManagement'].map(fKey => (
+                      <li key={fKey} className="flex items-center gap-3 text-sm text-slate-300">
                         <CheckCircle2 size={16} className="text-emerald-500" />
-                        {feature}
+                        {t(fKey)}
                       </li>
                     ))}
                   </ul>
@@ -253,7 +255,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
               </div>
 
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-2">Choose Payment Method</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-slate-500 ml-2">{t('choosePaymentMethod')}</label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { id: 'VODAFONE_CASH', name: 'Vodafone', icon: <Smartphone size={20} /> },
@@ -315,10 +317,10 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
                         disabled={loading}
                         className="w-full py-4 bg-primary text-white font-black uppercase tracking-widest text-xs rounded-2xl hover:bg-primary/80 transition-all shadow-xl shadow-primary/20 flex items-center justify-center gap-3 disabled:opacity-50"
                       >
-                        {loading ? 'Processing...' : (
+                        {loading ? t('processing') : (
                           <>
                             <Send size={16} />
-                            Submit Payment Proof
+                            {t('submitPaymentProof')}
                           </>
                         )}
                       </button>
@@ -332,14 +334,14 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
           {/* Right: Payment History */}
           <div className="space-y-6">
             <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl backdrop-blur-xl h-full">
-              <h3 className="text-lg font-bold text-white mb-6">Payment History</h3>
+              <h3 className="text-lg font-bold text-white mb-6">{t('paymentHistory')}</h3>
 
               {requests.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-4">
                   <div className="p-4 bg-white/5 rounded-full">
                     <Clock size={32} className="text-slate-600" />
                   </div>
-                  <p className="text-slate-500 text-sm italic">No payment requests found.</p>
+                  <p className="text-slate-500 text-sm italic">{t('noPaymentRequests')}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -366,7 +368,7 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
               <div className="mt-8 p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex gap-3">
                 <AlertCircle size={18} className="text-amber-500 shrink-0" />
                 <p className="text-[10px] text-amber-500/80 leading-relaxed uppercase font-bold">
-                  Manual Verification: Our team will verify your payment within 1-2 hours. Once approved, click "Refresh Status" above to instantly activate your account.
+                  {t('manualVerificationNote')}
                 </p>
               </div>
             </div>
@@ -377,9 +379,9 @@ const SubscriptionScreen = ({ user, onBack, onStatusUpdate }) => {
       {/* === PREMIUM: Renewal section === */}
       {isPremium && (
         <div className="bg-slate-900/50 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl backdrop-blur-xl">
-          <h3 className="text-lg font-bold text-white mb-6">Payment History</h3>
+          <h3 className="text-lg font-bold text-white mb-6">{t('paymentHistory')}</h3>
           {requests.length === 0 ? (
-            <p className="text-slate-500 text-sm italic text-center py-8">No payment records found.</p>
+            <p className="text-slate-500 text-sm italic text-center py-8">{t('noPaymentRequests')}</p>
           ) : (
             <div className="space-y-4">
               {requests.map(req => (
