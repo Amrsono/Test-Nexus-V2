@@ -2755,45 +2755,45 @@ const App = () => {
 
             {generatedScenarios.length > 0 && (
               <div id="lab-results-applet" className="space-y-8 pt-12 border-t border-white/5 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                  <div>
-                    <div className="flex items-center gap-3 mb-2">
-                      <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
-                        <CheckCircle2 size={24} />
-                      </div>
-                      <h3 className={`text-2xl font-black ${textColor}`}>Drafting Results</h3>
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-500">
+                      <CheckCircle2 size={24} />
                     </div>
-                    <p className={subTextColor}>We've prepared {generatedScenarios.length} scenarios covering your selected scope matrix.</p>
+                    <div>
+                      <h3 className={`text-2xl font-black ${textColor}`}>Drafting Results</h3>
+                      <p className={`text-sm ${subTextColor}`}>We've prepared {generatedScenarios.length} scenarios covering your selected scope matrix.</p>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:w-auto mt-2">
+                  <div className="flex flex-wrap gap-3">
                     <button 
                       onClick={clearDrafts}
-                      className={`flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                      className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
                         isDark 
                         ? 'border-rose-500/30 text-rose-500 hover:bg-rose-500/10' 
                         : 'border-rose-200 text-rose-600 hover:bg-rose-50 shadow-sm'
                       }`}
                     >
-                      <Trash2 size={18} className="shrink-0" />
-                      <span>Discard All Journeys</span>
+                      <Trash2 size={16} className="shrink-0" />
+                      Discard All Journeys
                     </button>
                     <button 
                       onClick={handleExportLabExcel}
-                      className={`flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                      className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
                         isDark 
                         ? 'bg-white/5 text-white border-white/10 hover:bg-white/10' 
                         : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm'
                       }`}
                     >
-                      <Upload size={18} className="rotate-180 shrink-0" />
-                      <span>Export to Excel</span>
+                      <Upload size={16} className="rotate-180 shrink-0" />
+                      Export to Excel
                     </button>
                     <button 
                       onClick={handleCommitScenarios}
-                      className="flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold bg-emerald-600 text-white rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
+                      className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-emerald-600 text-white rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
                     >
-                      <CheckCircle2 size={18} className="shrink-0" />
-                      <span>Commit to Project</span>
+                      <CheckCircle2 size={16} className="shrink-0" />
+                      Commit to Project
                     </button>
                   </div>
                 </div>
