@@ -1651,7 +1651,7 @@ const App = () => {
       }}
     >
       <header className="flex flex-col gap-6 mb-10">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
           <div className="flex items-center gap-4">
             {selectedProject?.logoUrl ? (
                <img src={selectedProject.logoUrl} alt="Project Logo" className="w-12 h-12 rounded-2xl object-cover shadow-md" />
@@ -1686,15 +1686,15 @@ const App = () => {
               </div>
            </div>
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-4 items-center w-full xl:w-auto justify-start xl:justify-end">
             <div className={`flex items-center gap-1 p-1 rounded-xl ${isDark ? 'bg-white/5 border-white/10' : 'bg-slate-100'} border`}>
-              {themes.map(t => (
+              {themes.map(theme => (
                 <button
-                  key={t.name}
-                  onClick={() => handleThemeChange(t.color)}
-                  className={`w-8 h-8 rounded-lg border transition-all ${localTheme === t.color ? 'ring-2 ring-primary scale-90' : 'opacity-60 hover:opacity-100'}`}
-                  style={{ backgroundColor: t.color }}
-                  title={t.name}
+                  key={theme.name}
+                  onClick={() => handleThemeChange(theme.color)}
+                  className={`w-8 h-8 rounded-lg border transition-all ${localTheme === theme.color ? 'ring-2 ring-primary scale-90' : 'opacity-60 hover:opacity-100'}`}
+                  style={{ backgroundColor: theme.color }}
+                  title={theme.name}
                 />
               ))}
             </div>
@@ -1789,132 +1789,136 @@ const App = () => {
         </div>
 
         {/* Project Tabs */}
-        <div className={`flex gap-2 p-1 ${isDark ? 'bg-black/20' : 'bg-slate-100'} backdrop-blur-sm rounded-2xl border-2 ${isDark ? 'border-white/10' : 'border-slate-400'} w-fit`}>
-          {projects.map(project => (
-            <div key={project.id} className="relative group flex items-center">
-              <button
-                onClick={() => setSelectedProjectId(project.id)}
-                className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                  selectedProjectId === project.id 
-                  ? (isDark ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'bg-white text-primary shadow-lg')
-                  : (isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-white/40')
-                }`}
-              >
-                {project.name}
-              </button>
-              {selectedProjectId === project.id && (
+        <div className="w-full overflow-x-auto no-scrollbar">
+          <div className={`flex gap-2 p-1 ${isDark ? 'bg-black/20' : 'bg-slate-100'} backdrop-blur-sm rounded-2xl border-2 ${isDark ? 'border-white/10' : 'border-slate-400'} w-fit flex-nowrap whitespace-nowrap`}>
+            {projects.map(project => (
+              <div key={project.id} className="relative group flex items-center shrink-0">
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    // Close = remove from UI list
-                    const remaining = projects.filter(p => p.id !== project.id);
-                    setProjects(remaining);
-                    setHiddenProjectIds(prev => [...prev, project.id]);
-                    
-                    // Switch selection to another project if one exists
-                    if (remaining.length > 0) {
-                      setSelectedProjectId(remaining[0].id);
-                    } else {
-                      setSelectedProjectId(null);
-                    }
-                  }}
-                  className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
-                  title="Close Project"
+                  onClick={() => setSelectedProjectId(project.id)}
+                  className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                    selectedProjectId === project.id 
+                    ? (isDark ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'bg-white text-primary shadow-lg')
+                    : (isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-white/40')
+                  }`}
                 >
-                  ✕
+                  {project.name}
                 </button>
-              )}
-            </div>
-          ))}
-          <button
-            onClick={() => {
-              if (!canMultipleProjects && projects.length >= 1) {
-                alert('Multi-Project is a Premium feature (£100/mo). Upgrade your subscription to create additional projects.');
-                return;
-              }
-              handleCreateProject();
-            }}
-            className={`px-4 py-2.5 rounded-xl font-bold flex items-center justify-center transition-all ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-slate-200'} border border-dashed border-slate-400/50`}
-            title={canMultipleProjects ? 'Create New Project' : 'Upgrade to Premium for multiple projects'}
-          >
-            <Plus size={18} />
-          </button>
+                {selectedProjectId === project.id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Close = remove from UI list
+                      const remaining = projects.filter(p => p.id !== project.id);
+                      setProjects(remaining);
+                      setHiddenProjectIds(prev => [...prev, project.id]);
+                      
+                      // Switch selection to another project if one exists
+                      if (remaining.length > 0) {
+                        setSelectedProjectId(remaining[0].id);
+                      } else {
+                        setSelectedProjectId(null);
+                      }
+                    }}
+                    className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
+                    title="Close Project"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            ))}
+            <button
+              onClick={() => {
+                if (!canMultipleProjects && projects.length >= 1) {
+                  alert('Multi-Project is a Premium feature (£100/mo). Upgrade your subscription to create additional projects.');
+                  return;
+                }
+                handleCreateProject();
+              }}
+              className={`px-4 py-2.5 rounded-xl font-bold flex items-center justify-center transition-all shrink-0 ${isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-slate-200'} border border-dashed border-slate-400/50`}
+              title={canMultipleProjects ? 'Create New Project' : 'Upgrade to Premium for multiple projects'}
+            >
+              <Plus size={18} />
+            </button>
+          </div>
         </div>
         {/* View Switcher */}
-        <div className={`flex gap-6 mt-4 border-b-2 ${isDark ? 'border-white/10' : 'border-slate-400'}`}>
-          <button 
-            onClick={() => setCurrentView('dashboard')}
-            className={`pb-4 px-2 text-sm font-bold transition-all relative ${
-              currentView === 'dashboard' 
-              ? (isDark ? 'text-primary' : 'text-primary') 
-              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-            }`}
-          >
-            {t('dashboard')}
-            {currentView === 'dashboard' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
-          </button>
-          <button 
-            onClick={() => setCurrentView('lab')}
-            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-              currentView === 'lab' 
-              ? (isDark ? 'text-primary' : 'text-primary') 
-              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-            }`}
-          >
-            <Brain size={16} />
-            {t('scenarioLab')}
-            {currentView === 'lab' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
-          </button>
-          <button 
-            onClick={() => setCurrentView('billing')}
-            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-              currentView === 'billing' 
-              ? (isDark ? 'text-primary' : 'text-primary') 
-              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-            }`}
-          >
-            <CreditCard size={16} />
-            {t('billing')}
-            {currentView === 'billing' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
-          </button>
-          {user.role === 'ADMIN' && (
+        <div className="w-full overflow-x-auto no-scrollbar">
+          <div className={`flex gap-6 mt-4 border-b-2 ${isDark ? 'border-white/10' : 'border-slate-400'} w-full min-w-max flex-nowrap`}>
             <button 
-              onClick={() => setCurrentView('admin')}
-              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-                currentView === 'admin' 
+              onClick={() => setCurrentView('dashboard')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative shrink-0 ${
+                currentView === 'dashboard' 
                 ? (isDark ? 'text-primary' : 'text-primary') 
                 : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
               }`}
             >
-              <Shield size={16} />
-              {t('systemAdmin')}
-              {currentView === 'admin' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+              {t('dashboard')}
+              {currentView === 'dashboard' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
             </button>
-          )}
-          <button 
-            onClick={() => setCurrentView('help')}
-            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-              currentView === 'help' 
-              ? (isDark ? 'text-primary' : 'text-primary') 
-              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-            }`}
-          >
-            <HelpCircle size={16} />
-            {t('help')}
-            {currentView === 'help' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
-          </button>
-          <button 
-            onClick={() => setCurrentView('about')}
-            className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 ${
-              currentView === 'about' 
-              ? (isDark ? 'text-primary' : 'text-primary') 
-              : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-            }`}
-          >
-            <Info size={16} />
-            {t('about')}
-            {currentView === 'about' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
-          </button>
+            <button 
+              onClick={() => setCurrentView('lab')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 shrink-0 ${
+                currentView === 'lab' 
+                ? (isDark ? 'text-primary' : 'text-primary') 
+                : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+              }`}
+            >
+              <Brain size={16} />
+              {t('scenarioLab')}
+              {currentView === 'lab' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+            </button>
+            <button 
+              onClick={() => setCurrentView('billing')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 shrink-0 ${
+                currentView === 'billing' 
+                ? (isDark ? 'text-primary' : 'text-primary') 
+                : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+              }`}
+            >
+              <CreditCard size={16} />
+              {t('billing')}
+              {currentView === 'billing' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+            </button>
+            {user.role === 'ADMIN' && (
+              <button 
+                onClick={() => setCurrentView('admin')}
+                className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 shrink-0 ${
+                  currentView === 'admin' 
+                  ? (isDark ? 'text-primary' : 'text-primary') 
+                  : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+                }`}
+              >
+                <Shield size={16} />
+                {t('systemAdmin')}
+                {currentView === 'admin' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+              </button>
+            )}
+            <button 
+              onClick={() => setCurrentView('help')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 shrink-0 ${
+                currentView === 'help' 
+                ? (isDark ? 'text-primary' : 'text-primary') 
+                : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+              }`}
+            >
+              <HelpCircle size={16} />
+              {t('help')}
+              {currentView === 'help' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+            </button>
+            <button 
+              onClick={() => setCurrentView('about')}
+              className={`pb-4 px-2 text-sm font-bold transition-all relative flex items-center gap-2 shrink-0 ${
+                currentView === 'about' 
+                ? (isDark ? 'text-primary' : 'text-primary') 
+                : (isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
+              }`}
+            >
+              <Info size={16} />
+              {t('about')}
+              {currentView === 'about' && <div className="absolute bottom-0 left-0 w-full h-1 bg-primary rounded-t-full" />}
+            </button>
+          </div>
         </div>
       </header>
       {loading && !selectedProjectId && currentView !== 'billing' && currentView !== 'admin-subs' ? (
