@@ -163,6 +163,7 @@ const App = () => {
   const [defectFilter, setDefectFilter] = useState('ALL');
 
   const [localTheme, setLocalTheme] = useState(() => localStorage.getItem('nexus_theme') || '#f8fafc');
+  const isDark = localTheme === '#1a1a2e' || localTheme === '#020617';
 
   const [labConfig, setLabConfig] = useState({
     release: '',
@@ -308,6 +309,29 @@ const App = () => {
   useEffect(() => {
     setHasLoadedDrafts(false);
   }, [selectedProjectId]);
+
+  // Set theme background color/image and dark class on body/html dynamically to avoid cutoff glitches
+  useEffect(() => {
+    document.body.style.transition = 'background-color 0.7s ease-in-out, background-image 0.7s ease-in-out';
+    document.body.style.backgroundColor = localTheme;
+    if (selectedProject?.backgroundUrl) {
+      document.body.style.backgroundImage = `url(${selectedProject.backgroundUrl})`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundRepeat = 'no-repeat';
+      document.body.style.backgroundAttachment = 'fixed';
+    } else {
+      document.body.style.backgroundImage = 'none';
+    }
+  }, [localTheme, selectedProject?.backgroundUrl]);
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
 
   // Sync Drafts with LocalStorage for persistence across tabs/refresh (USER & PROJECT ISOLATED)
   useEffect(() => {
@@ -1619,7 +1643,7 @@ const App = () => {
     }
   }, [generatedScenarios.length, isGenerating]);
 
-  const isDark = localTheme === '#1a1a2e' || localTheme === '#020617';
+
   const textColor = isDark ? 'text-white' : 'text-slate-900';
   const subTextColor = isDark ? 'text-slate-400' : 'text-slate-500';
   const cardBg = isDark ? 'bg-white/5 border border-white/10' : 'bg-white border-2 border-slate-400 shadow-md';
@@ -1644,11 +1668,7 @@ const App = () => {
 
   return (
     <div 
-      className="min-h-screen p-6 md:p-10 font-sans transition-all duration-700 ease-in-out bg-cover bg-center bg-no-repeat bg-fixed"
-      style={{ 
-        backgroundColor: localTheme,
-        backgroundImage: selectedProject?.backgroundUrl ? `url(${selectedProject.backgroundUrl})` : 'none'
-      }}
+      className="min-h-screen p-6 md:p-10 font-sans transition-all duration-700 ease-in-out"
     >
       <header className="flex flex-col gap-6 mb-10">
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
@@ -2745,27 +2765,35 @@ const App = () => {
                     </div>
                     <p className={subTextColor}>We've prepared {generatedScenarios.length} scenarios covering your selected scope matrix.</p>
                   </div>
-                  <div className="flex flex-wrap gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full sm:w-auto mt-2">
                     <button 
                       onClick={clearDrafts}
-                      className={`flex items-center gap-2 px-6 py-3 border rounded-2xl font-bold transition-all hover:scale-105 ${isDark ? 'border-rose-500/30 text-rose-500 hover:bg-rose-500/10' : 'border-rose-200 text-rose-600 hover:bg-rose-50 shadow-sm'}`}
+                      className={`flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                        isDark 
+                        ? 'border-rose-500/30 text-rose-500 hover:bg-rose-500/10' 
+                        : 'border-rose-200 text-rose-600 hover:bg-rose-50 shadow-sm'
+                      }`}
                     >
-                      <Trash2 size={18} />
-                      Discard All Journeys
+                      <Trash2 size={18} className="shrink-0" />
+                      <span>Discard All Journeys</span>
                     </button>
                     <button 
                       onClick={handleExportLabExcel}
-                      className={`flex items-center gap-2 px-6 py-3 ${isDark ? 'bg-white/10 text-white border-white/20' : 'bg-white text-slate-700 border-slate-200'} border rounded-2xl font-bold hover:scale-105 transition-all shadow-lg`}
+                      className={`flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold border rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] ${
+                        isDark 
+                        ? 'bg-white/5 text-white border-white/10 hover:bg-white/10' 
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 shadow-sm'
+                      }`}
                     >
-                      <Upload size={18} className="rotate-180" />
-                      Export to Excel
+                      <Upload size={18} className="rotate-180 shrink-0" />
+                      <span>Export to Excel</span>
                     </button>
                     <button 
                       onClick={handleCommitScenarios}
-                      className="flex items-center gap-2 px-7 py-3 bg-emerald-600 text-white rounded-2xl font-extrabold hover:bg-emerald-500 hover:scale-105 transition-all shadow-xl shadow-emerald-600/30"
+                      className="flex items-center justify-center gap-2 px-5 py-3 text-sm font-bold bg-emerald-600 text-white rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] hover:bg-emerald-500 shadow-lg shadow-emerald-600/20"
                     >
-                      <CheckCircle2 size={18} />
-                      Commit to Project
+                      <CheckCircle2 size={18} className="shrink-0" />
+                      <span>Commit to Project</span>
                     </button>
                   </div>
                 </div>
