@@ -3524,19 +3524,17 @@ const App = () => {
                 </button>
                 <button
                   onClick={async () => {
-                    if (window.confirm(`⚠️ CLEAR ALL JOURNEYS\n\nThis will permanently delete all ${allTestCases.length} journey(s) in this project. This action cannot be undone.\n\nAre you sure?`)) {
-                      if (window.confirm(`Final confirmation: Delete all ${allTestCases.length} journeys permanently?`)) {
-                        try {
-                          await axios.delete(`${API_BASE}/test-cases/clear-all`, { params: { projectId: selectedProjectId } });
-                          await fetchAllTestCases();
-                          await fetchStats();
-                          await fetchInsights();
-                          fetchBurndown();
-                          fetchUnassigned();
-                        } catch (e) {
-                          console.error('Clear all error', e);
-                          alert('Failed to clear journeys: ' + (e.response?.data?.error || e.message));
-                        }
+                    if (window.confirm(`⚠️ CLEAR ALL TRACKER DATA\n\nThis will reset all ${allTestCases.length} journey(s) back to their initial state:\n• All statuses → PENDING\n• All assignments removed\n• All validation checks cleared\n\nScenarios will remain visible in the Scenarios Lab.\n\nProceed?`)) {
+                      try {
+                        await axios.delete(`${API_BASE}/test-cases/clear-all`, { params: { projectId: selectedProjectId } });
+                        await fetchAllTestCases();
+                        await fetchStats();
+                        await fetchInsights();
+                        fetchBurndown();
+                        fetchUnassigned();
+                      } catch (e) {
+                        console.error('Clear all error', e);
+                        alert('Failed to clear tracker data: ' + (e.response?.data?.error || e.message));
                       }
                     }
                   }}
@@ -3544,6 +3542,7 @@ const App = () => {
                 >
                   Clear All
                 </button>
+
                 <button 
                   onClick={() => setIsTrackerOpen(false)}
                   className="p-2 hover:bg-white/10 rounded-xl transition-colors text-slate-400 hover:text-white"

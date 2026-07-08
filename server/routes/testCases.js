@@ -84,7 +84,8 @@ router.post('/reset', async (req, res) => {
   }
 });
 
-// Clear all journeys (hard delete) for a project
+// Clear all tracker data (assignments, statuses, validations) WITHOUT deleting the test cases
+// Scenarios remain visible in Scenarios Lab; only execution tracking data is wiped.
 router.delete('/clear-all', async (req, res) => {
   const { projectId } = req.query;
   if (!projectId) return res.status(400).json({ error: 'ProjectId is required' });
@@ -94,37 +95,59 @@ router.delete('/clear-all', async (req, res) => {
     if (!project) return res.status(404).json({ error: 'Project not found' });
 
     if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
-      return res.status(403).json({ error: 'You do not have permission to clear this project' });
+      return res.status(403).json({ error: 'You do not have permission to clear this project tracker' });
     }
 
     // Find all test cases for the project
     const testCases = await prisma.testCase.findMany({
       where: { suite: { projectId: projectId } },
-      select: { id: true }
+      select: { id: true, customValidations: true }
     });
+
+    if (testCases.length === 0) return res.json({ count: 0 });
+
     const testCaseIds = testCases.map(tc => tc.id);
 
-    if (testCaseIds.length === 0) {
-      return res.json({ count: 0 });
-    }
-
-    // Delete assignments first (foreign key constraint)
+    // 1. Remove all assignments (unassign everyone)
     await prisma.assignment.deleteMany({
       where: { testCaseId: { in: testCaseIds } }
     });
 
-    // Delete all test cases
-    const deleted = await prisma.testCase.deleteMany({
-      where: { id: { in: testCaseIds } }
+    // 2. Reset statuses and standard validation checks to initial state
+    await prisma.testCase.updateMany({
+      where: { id: { in: testCaseIds } },
+      data: {
+        status: 'PENDING',
+        checkUi: false,
+        checkOrderBuild: false,
+        checkOrderCompletion: false,
+        checkPcsMcpr: false
+      }
     });
 
-    res.json({ count: deleted.count });
+    // 3. Reset custom validation checked flags (requires per-record update)
+    for (const tc of testCases) {
+      if (tc.customValidations) {
+        try {
+          let cvs = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : tc.customValidations;
+          if (typeof cvs === 'string') cvs = JSON.parse(cvs);
+          if (Array.isArray(cvs) && cvs.some(cv => cv.checked)) {
+            const resetCvs = cvs.map(cv => ({ ...cv, checked: false }));
+            await prisma.testCase.update({
+              where: { id: tc.id },
+              data: { customValidations: JSON.stringify(resetCvs) }
+            });
+          }
+        } catch (e) {}
+      }
+    }
+
+    res.json({ count: testCases.length });
   } catch (error) {
-    console.error('Clear all error:', error);
+    console.error('Clear all tracker error:', error);
     res.status(500).json({ error: error.message });
   }
 });
-
 
 
 // Update test case status
