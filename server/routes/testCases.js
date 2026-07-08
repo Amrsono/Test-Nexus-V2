@@ -791,12 +791,12 @@ router.post('/export', async (req, res) => {
       
       // Values with live formula + pre-calculated cached results for quick loading
       row.getCell(1).value = mod; // Epic
-      row.getCell(2).value = { formula: `COUNTIF('Execution Tracker'!$D:$D, A${rowNum})`, result: journeysCount }; // Journeys
-      row.getCell(3).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PENDING")`, result: noRunsCount }; // Pending
-      row.getCell(4).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "<>PENDING")`, result: executedCount }; // Executed
-      row.getCell(5).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PASS")`, result: passedCount }; // Passed
-      row.getCell(6).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "IN PROGRESS")`, result: inProgressCount }; // In Progress
-      row.getCell(7).value = { formula: `COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "FAIL") + COUNTIFS('Execution Tracker'!$D:$D, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "BLOCKED")`, result: failedCount }; // Blocked/Failed
+      row.getCell(2).value = { formula: `COUNTIF('Execution Tracker'!$E:$E, A${rowNum})`, result: journeysCount }; // Journeys
+      row.getCell(3).value = { formula: `COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PENDING")`, result: noRunsCount }; // Pending
+      row.getCell(4).value = { formula: `COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "<>PENDING")`, result: executedCount }; // Executed
+      row.getCell(5).value = { formula: `COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "PASS")`, result: passedCount }; // Passed
+      row.getCell(6).value = { formula: `COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "IN PROGRESS")`, result: inProgressCount }; // In Progress
+      row.getCell(7).value = { formula: `COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "FAIL") + COUNTIFS('Execution Tracker'!$E:$E, A${rowNum}, 'Execution Tracker'!$${overCol}:$${overCol}, "BLOCKED")`, result: failedCount }; // Blocked/Failed
       row.getCell(8).value = { formula: `IF(B${rowNum}>0, D${rowNum}/B${rowNum}, 0)`, result: execRate }; // Execution Rate
       row.getCell(9).value = { formula: `IF(B${rowNum}>0, E${rowNum}/B${rowNum}, 0)`, result: passRate }; // Pass Rate
       
