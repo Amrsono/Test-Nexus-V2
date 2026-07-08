@@ -1129,12 +1129,46 @@ const App = () => {
   };
 
   const updateCaseStatus = async (caseId, status) => {
-    // Enforcement: Journey will not be considered completed/passed unless all 4 validations are ticked
+    // Enforcement: Journey will not be considered completed/passed unless all ACTIVE validation points are ticked
     if (status === 'PASS') {
       const tc = allTestCases.find(c => c.id === caseId);
-      if (tc && (!tc.checkUi || !tc.checkOrderBuild || !tc.checkOrderCompletion || !tc.checkPcsMcpr)) {
-        alert('Validation Blocked: You must manually tick all 4 validation points (UI, Order Build, Completion, PCS/MCPR) before passing this journey.');
-        return;
+      if (tc) {
+        // Build the same dynamic checklist the UI renders so we only require what is actually shown
+        const required = [];
+        required.push({ field: 'checkUi', checked: !!tc.checkUi });
+        if (tc.orderBuild)     required.push({ field: 'checkOrderBuild',      checked: !!tc.checkOrderBuild });
+        if (tc.orderCompletion) required.push({ field: 'checkOrderCompletion', checked: !!tc.checkOrderCompletion });
+        if (tc.tcAssurance)    required.push({ field: 'checkPcsMcpr',         checked: !!tc.checkPcsMcpr });
+        if (tc.billing) {
+          let parsedCustom = [];
+          try {
+            let p = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : (tc.customValidations || []);
+            if (typeof p === 'string') p = JSON.parse(p);
+            parsedCustom = Array.isArray(p) ? p : [];
+          } catch (_) {}
+          const billingItem = parsedCustom.find(cv => cv.id === 'billing_check');
+          required.push({ field: 'billing_check', checked: !!(billingItem?.checked) });
+        }
+        // Any additional custom validations
+        if (tc.customValidations) {
+          try {
+            let parsedCustom = typeof tc.customValidations === 'string' ? JSON.parse(tc.customValidations) : (tc.customValidations || []);
+            if (typeof parsedCustom === 'string') parsedCustom = JSON.parse(parsedCustom);
+            if (Array.isArray(parsedCustom)) {
+              parsedCustom
+                .filter(cv => cv.id !== 'billing_check')
+                .forEach(cv => required.push({ field: cv.id, checked: !!cv.checked }));
+            }
+          } catch (_) {}
+        }
+
+        const allTicked = required.every(r => r.checked);
+        if (!allTicked) {
+          const total = required.length;
+          const ticked = required.filter(r => r.checked).length;
+          alert(`Validation Blocked: You must tick all ${total} validation point(s) before passing this journey. (${ticked}/${total} done)`);
+          return;
+        }
       }
     }
 
@@ -1499,6 +1533,12 @@ const App = () => {
 
     let updated;
     if (applyToAll) {
+      // Reset checked states for other scenarios since their validation requirements changed
+      let resetCustomValidations = null;
+      if (serialized.customValidations) {
+        resetCustomValidations = serialized.customValidations.map(cv => ({ ...cv, checked: false }));
+      }
+
       updated = generatedScenarios.map((s, i) => {
         if (i === editingScenarioIndex) return savedScenario;
         return {
@@ -1507,10 +1547,16 @@ const App = () => {
           orderCompletion: serialized.orderCompletion,
           tcAssurance: serialized.tcAssurance,
           billing: serialized.billing,
-          customValidations: serialized.customValidations
+          customValidations: resetCustomValidations,
+          // Reset all standard check fields so testers must re-validate
+          checkOrderBuild: false,
+          checkOrderCompletion: false,
+          checkPcsMcpr: false,
+          // Reset to PENDING only if they were PASS (avoid touching FAIL or IN_PROGRESS)
+          status: s.status === 'PASS' ? 'PENDING' : s.status
         };
       });
-      setAgentLogs(prev => [...prev, `System: Validation points synced to all ${generatedScenarios.length} scenarios.`]);
+      setAgentLogs(prev => [...prev, `System: Validation points synced to all ${generatedScenarios.length} scenarios. Previously PASS scenarios reset to PENDING.`]);
 
       // Database sync for any database-backed scenarios
       const dbUpdates = updated
@@ -1518,7 +1564,12 @@ const App = () => {
         .map(s => axios.patch(`${API_BASE}/test-cases/${s.id}`, s));
       if (dbUpdates.length > 0) {
         Promise.all(dbUpdates)
-          .then(() => fetchAllTestCases())
+          .then(async () => {
+            await fetchAllTestCases();
+            await fetchStats();
+            await fetchInsights();
+            fetchBurndown();
+          })
           .catch(err => console.error("Database sync failed", err));
       }
     } else {
@@ -1527,7 +1578,12 @@ const App = () => {
 
       if (savedScenario.id) {
         axios.patch(`${API_BASE}/test-cases/${savedScenario.id}`, savedScenario)
-          .then(() => fetchAllTestCases())
+          .then(async () => {
+            await fetchAllTestCases();
+            await fetchStats();
+            await fetchInsights();
+            fetchBurndown();
+          })
           .catch(err => console.error("Database sync failed", err));
       }
     }
@@ -1609,9 +1665,26 @@ const App = () => {
     // --- Apply only the changed fields to every other scenario ---
     const patchForOthers = { ...changedSimple, ...changedValidation };
 
+    // If validation points changed, also reset their check states so testers must re-validate
+    const validationChanged = Object.keys(changedValidation).length > 0;
+    if (validationChanged) {
+      // Reset custom validation checked flags
+      if (patchForOthers.customValidations && Array.isArray(patchForOthers.customValidations)) {
+        patchForOthers.customValidations = patchForOthers.customValidations.map(cv => ({ ...cv, checked: false }));
+      }
+      patchForOthers.checkOrderBuild = false;
+      patchForOthers.checkOrderCompletion = false;
+      patchForOthers.checkPcsMcpr = false;
+    }
+
     const updated = generatedScenarios.map((s, i) => {
       if (i === editingScenarioIndex) return savedScenario;
-      return { ...s, ...patchForOthers };
+      const patched = { ...s, ...patchForOthers };
+      // Reset PASS → PENDING only if validation changed (test coverage requirements changed)
+      if (validationChanged && patched.status === 'PASS') {
+        patched.status = 'PENDING';
+      }
+      return patched;
     });
 
     setGeneratedScenarios(updated);
@@ -1620,7 +1693,7 @@ const App = () => {
     setEditingScenarioData(null);
     setOriginalScenarioSnapshot(null);
 
-    setAgentLogs(prev => [...prev, `System: Synced [${changedLabels.join(', ')}] to all ${count} scenarios.`]);
+    setAgentLogs(prev => [...prev, `System: Synced [${changedLabels.join(', ')}] to all ${count} scenarios.${validationChanged ? ' PASS statuses reset to PENDING.' : ''}`]);
 
     // Database sync for any database-backed scenarios
     const dbUpdates = updated
@@ -1628,7 +1701,12 @@ const App = () => {
       .map(s => axios.patch(`${API_BASE}/test-cases/${s.id}`, s));
     if (dbUpdates.length > 0) {
       Promise.all(dbUpdates)
-        .then(() => fetchAllTestCases())
+        .then(async () => {
+          await fetchAllTestCases();
+          await fetchStats();
+          await fetchInsights();
+          fetchBurndown();
+        })
         .catch(err => console.error("Database sync failed", err));
     }
   };
