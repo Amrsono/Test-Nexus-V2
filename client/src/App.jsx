@@ -3510,14 +3510,39 @@ const App = () => {
                       try {
                         await axios.post(`${API_BASE}/test-cases/reset`, { projectId: selectedProjectId });
                         await fetchAllTestCases();
+                        await fetchStats();
+                        await fetchInsights();
+                        fetchBurndown();
                       } catch (e) {
                         console.error('Reset error', e);
                       }
                     }
                   }}
+                  className="px-6 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl font-bold transition-all text-sm"
+                >
+                  Reset Journey Status
+                </button>
+                <button
+                  onClick={async () => {
+                    if (window.confirm(`⚠️ CLEAR ALL JOURNEYS\n\nThis will permanently delete all ${allTestCases.length} journey(s) in this project. This action cannot be undone.\n\nAre you sure?`)) {
+                      if (window.confirm(`Final confirmation: Delete all ${allTestCases.length} journeys permanently?`)) {
+                        try {
+                          await axios.delete(`${API_BASE}/test-cases/clear-all`, { params: { projectId: selectedProjectId } });
+                          await fetchAllTestCases();
+                          await fetchStats();
+                          await fetchInsights();
+                          fetchBurndown();
+                          fetchUnassigned();
+                        } catch (e) {
+                          console.error('Clear all error', e);
+                          alert('Failed to clear journeys: ' + (e.response?.data?.error || e.message));
+                        }
+                      }
+                    }
+                  }}
                   className="px-6 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-xl font-bold transition-all text-sm mr-4"
                 >
-                  Reset Tracker
+                  Clear All
                 </button>
                 <button 
                   onClick={() => setIsTrackerOpen(false)}
@@ -3526,6 +3551,7 @@ const App = () => {
                   <Plus className="w-8 h-8 rotate-45" />
                 </button>
               </div>
+
             </div>
 
             {/* Filters */}

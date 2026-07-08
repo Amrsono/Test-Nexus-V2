@@ -84,6 +84,49 @@ router.post('/reset', async (req, res) => {
   }
 });
 
+// Clear all journeys (hard delete) for a project
+router.delete('/clear-all', async (req, res) => {
+  const { projectId } = req.query;
+  if (!projectId) return res.status(400).json({ error: 'ProjectId is required' });
+
+  try {
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) return res.status(404).json({ error: 'Project not found' });
+
+    if (project.ownerId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'You do not have permission to clear this project' });
+    }
+
+    // Find all test cases for the project
+    const testCases = await prisma.testCase.findMany({
+      where: { suite: { projectId: projectId } },
+      select: { id: true }
+    });
+    const testCaseIds = testCases.map(tc => tc.id);
+
+    if (testCaseIds.length === 0) {
+      return res.json({ count: 0 });
+    }
+
+    // Delete assignments first (foreign key constraint)
+    await prisma.assignment.deleteMany({
+      where: { testCaseId: { in: testCaseIds } }
+    });
+
+    // Delete all test cases
+    const deleted = await prisma.testCase.deleteMany({
+      where: { id: { in: testCaseIds } }
+    });
+
+    res.json({ count: deleted.count });
+  } catch (error) {
+    console.error('Clear all error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
+
 // Update test case status
 router.patch('/:id/status', async (req, res) => {
   const { id } = req.params;
