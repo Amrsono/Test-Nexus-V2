@@ -1,5 +1,5 @@
-import React from 'react';
-import { Shield, Sparkles, LogOut, Sun, Moon, HelpCircle, Info, Settings } from 'lucide-react';
+import React, { useState } from 'react';
+import { Shield, Sparkles, LogOut, Upload, Download, Settings, ChevronDown, FileSpreadsheet, Presentation, FileText } from 'lucide-react';
 import LanguageSwitcher from './LanguageSwitcher';
 
 export const HeaderNav = ({
@@ -9,10 +9,18 @@ export const HeaderNav = ({
   isDark,
   setIsDark,
   onLogout,
-  subscriptionStatus = 'TRIAL'
+  onOpenImportModal,
+  onExportExcel,
+  onExportCSV,
+  onExportPPT,
+  subscriptionStatus = 'PRO'
 }) => {
+  const [showExportMenu, setShowExportMenu] = useState(false);
+
+  const isAdmin = user && (user.role === 'ADMIN' || user.isAdmin === true);
+
   return (
-    <header className="w-full flex items-center justify-between px-6 py-4 border-b border-white/10 backdrop-blur-md sticky top-0 z-40 bg-slate-950/80">
+    <header className="w-full flex flex-wrap items-center justify-between px-6 py-3.5 border-b border-white/10 backdrop-blur-md sticky top-0 z-40 bg-slate-950/90 shadow-xl">
       {/* Brand Logo */}
       <div className="flex items-center gap-3 cursor-pointer" onClick={() => setCurrentView('dashboard')}>
         <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 shadow-lg text-white">
@@ -27,7 +35,7 @@ export const HeaderNav = ({
       </div>
 
       {/* Navigation View Switcher */}
-      <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900 border border-slate-800">
+      <div className="flex items-center gap-1 p-1 rounded-2xl bg-slate-900 border border-slate-800">
         <button
           onClick={() => setCurrentView('dashboard')}
           className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
@@ -42,7 +50,7 @@ export const HeaderNav = ({
             currentView === 'lab' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
           }`}
         >
-          <Sparkles className="w-3.5 h-3.5 text-amber-400" /> Scenario Lab
+          <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-pulse" /> Scenario Lab
         </button>
         <button
           onClick={() => setCurrentView('subscription')}
@@ -54,7 +62,7 @@ export const HeaderNav = ({
         </button>
         <button
           onClick={() => setCurrentView('help')}
-          className={`px-3 py-2 text-xs font-bold rounded-xl transition-all ${
+          className={`px-3.5 py-2 text-xs font-bold rounded-xl transition-all ${
             currentView === 'help' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
           }`}
         >
@@ -62,20 +70,71 @@ export const HeaderNav = ({
         </button>
       </div>
 
-      {/* User / Settings / Action Items */}
-      <div className="flex items-center gap-3">
+      {/* Import / Export & User Controls */}
+      <div className="flex items-center gap-2.5">
+        {/* Import Button */}
+        {onOpenImportModal && (
+          <button
+            onClick={onOpenImportModal}
+            className="px-3.5 py-2 rounded-xl border text-xs font-bold bg-white/5 border-white/10 hover:bg-white/10 text-white transition-all flex items-center gap-1.5 shadow-sm"
+            title="Import Excel / CSV Test Cases"
+          >
+            <Upload className="w-4 h-4 text-indigo-400" /> Import Data
+          </button>
+        )}
+
+        {/* Export Menu */}
+        <div className="relative">
+          <button
+            onClick={() => setShowExportMenu(!showExportMenu)}
+            className="px-3.5 py-2 rounded-xl border text-xs font-bold bg-white/5 border-white/10 hover:bg-white/10 text-white transition-all flex items-center gap-1.5 shadow-sm"
+          >
+            <Download className="w-4 h-4 text-emerald-400" /> Export <ChevronDown className="w-3 h-3 opacity-60" />
+          </button>
+
+          {showExportMenu && (
+            <div className="absolute right-0 mt-2 w-48 py-2 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl z-50 text-xs font-bold animate-in fade-in">
+              {onExportExcel && (
+                <button
+                  onClick={() => { onExportExcel(); setShowExportMenu(false); }}
+                  className="w-full px-4 py-2.5 text-left text-slate-200 hover:bg-white/10 flex items-center gap-2 transition-colors"
+                >
+                  <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Export Excel (.xlsx)
+                </button>
+              )}
+              {onExportCSV && (
+                <button
+                  onClick={() => { onExportCSV(); setShowExportMenu(false); }}
+                  className="w-full px-4 py-2.5 text-left text-slate-200 hover:bg-white/10 flex items-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4 text-blue-400" /> Export CSV (.csv)
+                </button>
+              )}
+              {onExportPPT && (
+                <button
+                  onClick={() => { onExportPPT(); setShowExportMenu(false); }}
+                  className="w-full px-4 py-2.5 text-left text-slate-200 hover:bg-white/10 flex items-center gap-2 transition-colors"
+                >
+                  <Presentation className="w-4 h-4 text-amber-400" /> Export PPT Report
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         <LanguageSwitcher />
 
-        {user && user.role === 'ADMIN' && (
+        {/* Admin Dashboard Tab Button */}
+        {isAdmin && (
           <button
             onClick={() => setCurrentView('admin')}
-            className={`p-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all ${
               currentView === 'admin'
-                ? 'bg-purple-600 text-white border-purple-500'
+                ? 'bg-purple-600 text-white border-purple-500 shadow-md'
                 : 'bg-purple-950/40 border-purple-500/30 text-purple-300 hover:bg-purple-900/50'
             }`}
           >
-            <Settings className="w-4 h-4" /> Admin
+            <Settings className="w-4 h-4 text-purple-300" /> Admin
           </button>
         )}
 
@@ -83,7 +142,10 @@ export const HeaderNav = ({
         {user && (
           <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
             <div className="text-right">
-              <div className="text-xs font-bold text-white">{user.name || user.email}</div>
+              <div className="text-xs font-bold text-white flex items-center gap-1">
+                {user.name || user.email}
+                {isAdmin && <span className="px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 text-[9px] border border-purple-500/30">ADMIN</span>}
+              </div>
               <div className="text-[10px] text-emerald-400 font-semibold uppercase">{subscriptionStatus}</div>
             </div>
             <button

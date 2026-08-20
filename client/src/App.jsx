@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import api from './services/api';
 import useToast, { ToastProvider } from './hooks/useToast';
+import ScenarioLabScreen from './components/ScenarioLabScreen';
+import ImportModal from './components/ImportModal';
 import HeaderNav from './components/HeaderNav';
 import ExecutiveHero from './components/ExecutiveHero';
 import BurndownPanel from './components/BurndownPanel';
@@ -147,6 +149,59 @@ function AppContent() {
     }
   };
 
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+
+  // Excel & CSV Exports
+  const handleExportExcel = async () => {
+    if (!activeProjectId) return;
+    try {
+      toast.info('Generating Excel suite export...');
+      const res = await api.get(`/reports/export/excel?projectId=${activeProjectId}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `TestNexus_Suite_${activeProjectId}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.success('Excel Report downloaded!');
+    } catch (err) {
+      toast.error('Failed to export Excel report.');
+    }
+  };
+
+  const handleExportCSV = async () => {
+    if (testCases.length === 0) {
+      toast.warning('No test cases to export.');
+      return;
+    }
+    const headers = ['ID', 'Summary', 'Module', 'Priority', 'Status', 'Steps', 'Expected Result'];
+    const csvRows = [
+      headers.join(','),
+      ...testCases.map((tc) =>
+        [
+          `"${tc.key || tc.id}"`,
+          `"${(tc.summary || tc.title || '').replace(/"/g, '""')}"`,
+          `"${(tc.module || 'Core').replace(/"/g, '""')}"`,
+          `"${tc.priority || 'MEDIUM'}"`,
+          `"${tc.status || 'UNEXECUTED'}"`,
+          `"${(tc.steps || '').replace(/"/g, '""')}"`,
+          `"${(tc.expectedResult || '').replace(/"/g, '""')}"`
+        ].join(',')
+      )
+    ];
+
+    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `TestNexus_Cases_${activeProjectId || 'export'}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    toast.success('CSV Export downloaded!');
+  };
+
   // PPT Export
   const handleExportPPT = async () => {
     if (!activeProjectId) return;
@@ -221,6 +276,10 @@ function AppContent() {
         isDark={isDark}
         setIsDark={setIsDark}
         onLogout={handleLogout}
+        onOpenImportModal={() => setIsImportModalOpen(true)}
+        onExportExcel={handleExportExcel}
+        onExportCSV={handleExportCSV}
+        onExportPPT={handleExportPPT}
         subscriptionStatus={user.subscriptionStatus || 'PRO'}
       />
 
@@ -262,12 +321,6 @@ function AppContent() {
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsNewProjectModalOpen(true)}
-              className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" /> Add Project
-            </button>
-            <button
               onClick={() => setIsTeamModalOpen(true)}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 transition-all flex items-center gap-1.5"
             >
@@ -287,8 +340,20 @@ function AppContent() {
         {currentView === 'admin' && <AdminDashboard user={user} />}
         {currentView === 'help' && <HelpScreen />}
         {currentView === 'about' && <AboutScreen />}
+        {currentView === 'lab' && (
+          <ScenarioLabScreen
+            activeProjectId={activeProjectId}
+            projects={projects}
+            isDark={isDark}
+            onCommitScenarios={async (scenarios) => {
+              await api.post('/test-cases/batch', { projectId: activeProjectId, testCases: scenarios });
+              toast.success(`Committed ${scenarios.length} scenarios to project workload!`);
+              fetchProjectData();
+            }}
+          />
+        )}
 
-        {(currentView === 'dashboard' || currentView === 'lab') && (
+        {currentView === 'dashboard' && (
           <div className="space-y-8">
             {/* Executive Hero */}
             <ExecutiveHero
@@ -434,6 +499,19 @@ function AppContent() {
         defectData={defectFormData}
         onChange={(field, val) => setDefectFormData((prev) => ({ ...prev, [field]: val }))}
         onSubmit={handleDefectSubmit}
+        isDark={isDark}
+      />
+
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        activeProjectId={activeProjectId}
+        projects={projects}
+        onImportComplete={(importedCases, destination) => {
+          if (destination === 'workload') {
+            fetchProjectData();
+          }
+        }}
         isDark={isDark}
       />
 
