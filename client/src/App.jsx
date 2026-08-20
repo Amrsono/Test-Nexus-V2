@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Analytics } from '@vercel/analytics/react';
 import { 
   CheckCircle2, AlertCircle, Clock, Upload, Download, 
-  Plus, Shield, Sparkles, Filter, RefreshCw, Trash2, Edit3, Bug, Users
+  Plus, Shield, Sparkles, Filter, RefreshCw, Trash2, Edit3, Bug, Users, FolderPlus
 } from 'lucide-react';
 import api from './services/api';
 import useToast, { ToastProvider } from './hooks/useToast';
@@ -13,6 +13,7 @@ import AIInsightsPanel from './components/AIInsightsPanel';
 import TeamModal from './components/TeamModal';
 import DefectModal from './components/DefectModal';
 import ScenarioEditorModal from './components/ScenarioEditorModal';
+import NewProjectModal from './components/NewProjectModal';
 import ToastNotification from './components/ToastNotification';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
@@ -53,6 +54,20 @@ function AppContent() {
   const [defectFormData, setDefectFormData] = useState({ title: '', severity: 'P2', status: 'OPEN', owner: '', externalId: '' });
   const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
   const [editingScenario, setEditingScenario] = useState(null);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+
+  const handleCreateProject = async (projectData) => {
+    try {
+      const res = await api.post('/projects', projectData);
+      toast.success(`Project "${res.data.name || 'Workspace'}" created successfully!`);
+      await fetchProjects();
+      if (res.data?.id) {
+        setActiveProjectId(res.data.id);
+      }
+    } catch (err) {
+      toast.error(err.formattedMessage || 'Failed to create project.');
+    }
+  };
 
   // Fetch Projects
   const fetchProjects = useCallback(async () => {
@@ -237,9 +252,21 @@ function AppContent() {
                 ))
               )}
             </select>
+            <button
+              onClick={() => setIsNewProjectModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md flex items-center gap-1.5"
+            >
+              <FolderPlus className="w-4 h-4" /> New Workspace
+            </button>
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsNewProjectModalOpen(true)}
+              className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1.5"
+            >
+              <Plus className="w-4 h-4" /> Add Project
+            </button>
             <button
               onClick={() => setIsTeamModalOpen(true)}
               className="px-3.5 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 transition-all flex items-center gap-1.5"
@@ -407,6 +434,13 @@ function AppContent() {
         defectData={defectFormData}
         onChange={(field, val) => setDefectFormData((prev) => ({ ...prev, [field]: val }))}
         onSubmit={handleDefectSubmit}
+        isDark={isDark}
+      />
+
+      <NewProjectModal
+        isOpen={isNewProjectModalOpen}
+        onClose={() => setIsNewProjectModalOpen(false)}
+        onCreateProject={handleCreateProject}
         isDark={isDark}
       />
 
