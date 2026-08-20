@@ -2,6 +2,9 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const multer = require('multer');
+const validate = require('../middleware/validate');
+const logger = require('../lib/logger');
+const { createProjectSchema } = require('../middleware/schemas');
 
 const upload = multer({ storage: multer.memoryStorage() });
 const { auth } = require('../middleware/auth');
@@ -20,20 +23,16 @@ router.get('/', async (req, res) => {
     });
     res.json(projects);
   } catch (error) {
-    console.error('Fetch Projects Error:', error);
+    logger.error('Fetch Projects Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Create new project
-router.post('/', async (req, res) => {
+router.post('/', validate(createProjectSchema), async (req, res) => {
   const { name, themeColor, startDate, goLiveDate } = req.body;
   
-  console.log(`[Production] Attempting to create project: "${name}"`);
-  
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'Project name is required' });
-  }
+  logger.info(`Attempting to create project: "${name}"`, { userId: req.user.id });
 
   try {
     // Robust date parsing
@@ -52,12 +51,13 @@ router.post('/', async (req, res) => {
         ownerId: req.user.id
       }
     });
-    console.log(`[Production] Project created successfully: ${project.id}`);
+    logger.info(`Project created successfully: ${project.id}`, { projectId: project.id });
     res.json(project);
   } catch (error) {
-    console.error('[Production] Create Project Error:', error);
+    logger.error('Create Project Error:', error);
     // Return a clean error message to the frontend
     let msg = error.message;
+
     if (error.code === 'P2002') msg = 'A project with this name already exists.';
     if (error.message.includes('PrismaClientInitializationError')) msg = 'Database connection failed. Please check environment variables.';
     

@@ -6,7 +6,7 @@ const logger = {
     console.warn(JSON.stringify({ timestamp: new Date().toISOString(), level: 'WARN', message, ...meta }));
   },
   error: (message, error = null, meta = {}) => {
-    const errorDetails = error ? { errorName: error.name, errorMessage: error.message, errorStack: error.stack } : {};
+    const errorDetails = error ? { errorName: error.name || 'Error', errorMessage: error.message || String(error), errorStack: error.stack } : {};
     console.error(JSON.stringify({
       timestamp: new Date().toISOString(),
       level: 'ERROR',
@@ -14,7 +14,13 @@ const logger = {
       ...errorDetails,
       ...meta
     }));
+  },
+  debug: (message, meta = {}) => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.log(JSON.stringify({ timestamp: new Date().toISOString(), level: 'DEBUG', message, ...meta }));
+    }
   }
 };
 
 module.exports = logger;
+

@@ -3,7 +3,7 @@
  * Uses Supertest to fire real HTTP requests against the Express app,
  * with Prisma mocked so no live database is required.
  */
-jest.mock('../lib/prisma', () => ({
+jest.mock('../../lib/prisma', () => ({
   project: {
     findUnique: jest.fn(),
   },
@@ -17,16 +17,20 @@ jest.mock('../lib/prisma', () => ({
 }));
 
 // Mock auth middleware to inject a test user
-jest.mock('../middleware/auth', () => ({
+jest.mock('../../middleware/auth', () => ({
   auth: (req, _res, next) => {
     req.user = { id: 'user-1', role: 'USER' };
     next();
   },
+  isAdmin: (_req, _res, next) => next(),
+  canImport: (_req, _res, next) => next(),
 }));
+
 
 const request = require('supertest');
 const app = require('../../index');
-const prisma = require('../lib/prisma');
+const prisma = require('../../lib/prisma');
+
 
 const mockProject = {
   id: 'project-1',

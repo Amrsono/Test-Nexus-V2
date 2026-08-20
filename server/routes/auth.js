@@ -1,14 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { PrismaClient } = require('@prisma/client');
+const prisma = require('../lib/prisma');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const validate = require('../middleware/validate');
+const logger = require('../lib/logger');
+const { registerSchema, loginSchema } = require('../middleware/schemas');
 
-const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecretnexus';
 
 // Register
-router.post('/register', async (req, res) => {
+router.post('/register', validate(registerSchema), async (req, res) => {
   const { name, email, password } = req.body;
   try {
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -29,14 +31,16 @@ router.post('/register', async (req, res) => {
     });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    logger.info(`User registered successfully: ${email}`, { userId: user.id });
     res.json({ user, token });
   } catch (err) {
+    logger.error('Registration error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await prisma.user.findUnique({ where: { email } });
@@ -46,11 +50,14 @@ router.post('/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
 
     const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '7d' });
+    logger.info(`User logged in: ${email}`, { userId: user.id });
     res.json({ user, token });
   } catch (err) {
+    logger.error('Login error:', err);
     res.status(500).json({ error: err.message });
   }
 });
+
 
 // Get current user
 router.get('/me', async (req, res) => {

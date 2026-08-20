@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 const prisma = require('../lib/prisma');
 const pptxgen = require('pptxgenjs');
+const logger = require('../lib/logger');
 
 // GET /api/reports/project/:id/ppt
 router.get('/project/:id/ppt', async (req, res) => {
   const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({ error: 'Project ID is required' });
+  }
 
   try {
     const project = await prisma.project.findUnique({
@@ -40,8 +44,9 @@ router.get('/project/:id/ppt', async (req, res) => {
       p4: project.defects.filter(d => d.severity === 'P4').length,
     };
 
-    console.log(`Starting Nexus 2030 PPT generation for ${project.name}...`);
+    logger.info(`Starting Nexus 2030 PPT generation for project: ${project.name}`, { projectId: id });
     const pres = new (pptxgen.default || pptxgen)();
+
     
     // Set global layout/sizing
     pres.layout = 'LAYOUT_16x9';
@@ -390,9 +395,9 @@ router.get('/project/:id/ppt', async (req, res) => {
       x: 5.5, y: 4.1, w: 4, h: 0.8, fontSize: 11, color: "10B981", fontFace: "Arial", italic: true, valign: "top", margin: 0 
     });
 
-    console.log("Generating buffer...");
-    const data = await pres.write("nodebuffer");
-    console.log("Buffer generated successfully.");
+    logger.debug('Generating presentation buffer...');
+    const data = await pres.write('nodebuffer');
+    logger.info('Presentation buffer generated successfully', { projectId: id });
     
     // Create a safe filename (replace all non-alphanumeric with underscore)
     const safeFileName = `${project.name.replace(/[^a-z0-9]/gi, '_')}_Status_Report.pptx`;
@@ -402,9 +407,10 @@ router.get('/project/:id/ppt', async (req, res) => {
     res.send(data);
 
   } catch (error) {
-    console.error('Backend PPT Export Error:', error);
+    logger.error('Backend PPT Export Error:', error, { projectId: req.params.id });
     res.status(500).json({ error: error.message });
   }
 });
 
 module.exports = router;
+

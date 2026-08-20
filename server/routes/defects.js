@@ -6,15 +6,11 @@ const ExcelJS = require('exceljs');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
 const validate = require('../middleware/validate');
-
-const createDefectSchema = {
-  projectId: { required: true, type: 'string' },
-  title: { required: true, type: 'string' },
-  severity: { type: 'string', pattern: /^(P1|P2|P3|P4)$/ },
-  status: { type: 'string', pattern: /^(OPEN|FIXED|VERIFIED|CLOSED)$/ }
-};
+const logger = require('../lib/logger');
+const { createDefectSchema, updateDefectSchema } = require('../middleware/schemas');
 
 router.use(auth);
+
 
 // Export defects to Excel
 router.get('/export', async (req, res) => {
@@ -303,7 +299,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
 
     res.json({ success: true, count: importedCount });
   } catch (error) {
-    console.error('Defect Sync/Import Error:', error);
+    logger.error('Defect Sync/Import Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -329,6 +325,7 @@ router.get('/', async (req, res) => {
     });
     res.json(defects);
   } catch (error) {
+    logger.error('Defect Fetch Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -367,13 +364,13 @@ router.post('/', validate(createDefectSchema), async (req, res) => {
     });
     res.json(defect);
   } catch (error) {
-    console.error('Defect Creation Error:', error);
+    logger.error('Defect Creation Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Update a defect
-router.patch('/:id', async (req, res) => {
+router.patch('/:id', validate(updateDefectSchema), async (req, res) => {
   const { id } = req.params;
   const { 
     title, severity, description, status,
@@ -400,7 +397,7 @@ router.patch('/:id', async (req, res) => {
     });
     res.json(defect);
   } catch (error) {
-    console.error('Defect Update Error:', error);
+    logger.error('Defect Update Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -412,8 +409,10 @@ router.delete('/:id', async (req, res) => {
     await prisma.defect.delete({ where: { id } });
     res.json({ message: 'Defect deleted successfully' });
   } catch (error) {
+    logger.error('Defect Delete Error:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 module.exports = router;
+

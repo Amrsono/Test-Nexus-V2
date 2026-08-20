@@ -3,8 +3,12 @@ const router = express.Router();
 const prisma = require('../lib/prisma');
 const { auth } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
+const validate = require('../middleware/validate');
+const logger = require('../lib/logger');
+const { createTestCaseSchema, updateTestCaseSchema, resetTestCasesSchema } = require('../middleware/schemas');
 
 router.use(auth);
+
 
 // Get all test cases for a project
 router.get('/', async (req, res) => {
@@ -33,10 +37,31 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Create a single test case
+router.post('/', validate(createTestCaseSchema), async (req, res) => {
+  const { summary, priority, module: mod, steps, expectedResult, suiteId } = req.body;
+  try {
+    const testCase = await prisma.testCase.create({
+      data: {
+        summary,
+        priority: priority || 'MEDIUM',
+        module: mod || 'General',
+        steps: steps || '',
+        expectedResult: expectedResult || '',
+        status: 'PENDING',
+        suiteId: suiteId || null
+      }
+    });
+    res.status(201).json(testCase);
+  } catch (error) {
+    logger.error('Test case creation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Reset all test cases for a project to PENDING
-router.post('/reset', async (req, res) => {
+router.post('/reset', validate(resetTestCasesSchema), async (req, res) => {
   const { projectId } = req.body;
-  if (!projectId) return res.status(400).json({ error: 'ProjectId is required' });
 
   try {
     const project = await prisma.project.findUnique({ where: { id: projectId } });
@@ -56,6 +81,7 @@ router.post('/reset', async (req, res) => {
         checkPcsMcpr: false
       }
     });
+
 
     const testCasesToReset = await prisma.testCase.findMany({
       where: { suite: { projectId: projectId }, customValidations: { not: null } }

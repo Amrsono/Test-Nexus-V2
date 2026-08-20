@@ -1,9 +1,10 @@
-const validate = (schema) => (req, res, next) => {
+const validate = (schema, source = 'body') => (req, res, next) => {
   const errors = [];
-  
+  const dataSource = source === 'query' ? req.query : (source === 'params' ? req.params : (req.body || {}));
+
   Object.keys(schema).forEach((key) => {
     const rules = schema[key];
-    const val = req.body[key] !== undefined ? req.body[key] : req.query[key];
+    const val = dataSource !== undefined && dataSource !== null ? dataSource[key] : undefined;
 
     if (rules.required && (val === undefined || val === null || val === '')) {
       errors.push(`Field '${key}' is required.`);
@@ -17,6 +18,9 @@ const validate = (schema) => (req, res, next) => {
       if (rules.pattern && !rules.pattern.test(String(val))) {
         errors.push(`Field '${key}' format is invalid.`);
       }
+      if (rules.enum && Array.isArray(rules.enum) && !rules.enum.includes(val)) {
+        errors.push(`Field '${key}' must be one of: ${rules.enum.join(', ')}.`);
+      }
     }
   });
 
@@ -28,3 +32,4 @@ const validate = (schema) => (req, res, next) => {
 };
 
 module.exports = validate;
+

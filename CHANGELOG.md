@@ -35,4 +35,27 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and
 
 ## [Unreleased]
 
-- Pending items will be recorded here as work continues.
+### Added
+- **Comprehensive Offline Test Suites**: Expanded test coverage across client and server with mocked Prisma and zero external dependencies:
+  - `server/routes/__tests__/testCases.test.js` (CRUD, status transitions, batch updates, schema validation)
+  - `server/routes/__tests__/reports.test.js` (PPT report generator, 404/200 handling)
+  - `server/routes/__tests__/auth.test.js` (Registration, login, password hashing, JWT)
+  - `server/routes/__tests__/projects.test.js` (Project CRUD, validation)
+  - `server/middleware/__tests__/errorHandler.test.js` (Typed `AppError` hierarchy)
+  - `client/src/components/__tests__/AdminDashboard.test.jsx` (Overview, Users, Settings tab flows)
+  - `client/src/components/__tests__/BurndownPanel.test.jsx` (Chart and statistics rendering)
+  - `client/src/components/__tests__/ExecutiveHero.test.jsx` (Quality gate calculation)
+  - `client/src/components/__tests__/TeamModal.test.jsx` (Tester and capacity management)
+  - `client/src/components/__tests__/AIInsightsPanel.test.jsx` (Risk feed and suggested actions)
+- **Centralized API Client** (`client/src/services/api.js`): Axios client with auth interceptors and normalized error extraction.
+- **Modern Toast Notification System** (`client/src/hooks/useToast.js` & `client/src/components/ToastNotification.jsx`): Non-blocking alert replacement.
+- **Typed Error Hierarchy** (`server/middleware/errorHandler.js`): `AppError`, `ValidationError`, `UnauthorizedError`, `ForbiddenError`, `NotFoundError`, `ConflictError`.
+- **Validation Schema Registry** (`server/middleware/schemas.js`): Standardized schemas across all endpoints.
+
+### Changed
+- **Modularized Excel Services**: Split `server/services/testCaseExcelService.js` (754 LOC) into focused submodules (`excelStyles.js`, `excelExport.js`, `excelBurndownSheet.js`, `excelSync.js`), all <400 LOC.
+- **Refactored `AdminDashboard.jsx`**: Decomposed from 555 LOC monolithic component down to ~180 LOC by extracting `AdminInsightsTab.jsx`, `AdminUsersTab.jsx`, and `AdminSettingsTab.jsx`.
+- **Modular Frontend Architecture**: Extracted `ExecutiveHero.jsx`, `BurndownPanel.jsx`, `AIInsightsPanel.jsx`, `TeamModal.jsx`, `ScenarioEditorModal.jsx`, `HeaderNav.jsx`, `DefectModal.jsx`.
+- **Optimized CI Workflow**: Split `.github/workflows/ci.yml` into fast offline unit tests, DB integration tests, linting, build, and dependency audit jobs.
+- **Coverage Configuration**: Configured Jest `--coverage` in workspace packages.
+
