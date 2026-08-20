@@ -217,13 +217,25 @@ function AppContent() {
             <select
               value={activeProjectId}
               onChange={(e) => setActiveProjectId(e.target.value)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold border ${
-                isDark ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-300'
+              className={`px-4 py-2 rounded-xl text-sm font-bold border outline-none min-w-[200px] cursor-pointer transition-all ${
+                isDark ? 'bg-slate-900 border-slate-700 text-white shadow-sm' : 'bg-white border-slate-300 text-slate-900'
               }`}
             >
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {projects.length === 0 ? (
+                <option value="" disabled className={isDark ? 'bg-slate-900 text-slate-400' : 'bg-white text-slate-500'}>
+                  Select Workspace...
+                </option>
+              ) : (
+                projects.map((p) => (
+                  <option
+                    key={p.id}
+                    value={p.id}
+                    className={isDark ? 'bg-slate-900 text-white py-1' : 'bg-white text-slate-900 py-1'}
+                  >
+                    {p.name}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
