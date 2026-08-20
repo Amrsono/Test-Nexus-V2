@@ -5,6 +5,14 @@ const { auth } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const multer = require('multer');
 const upload = multer({ storage: multer.memoryStorage() });
+const validate = require('../middleware/validate');
+
+const createDefectSchema = {
+  projectId: { required: true, type: 'string' },
+  title: { required: true, type: 'string' },
+  severity: { type: 'string', pattern: /^(P1|P2|P3|P4)$/ },
+  status: { type: 'string', pattern: /^(OPEN|FIXED|VERIFIED|CLOSED)$/ }
+};
 
 router.use(auth);
 
@@ -326,7 +334,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new defect
-router.post('/', async (req, res) => {
+router.post('/', validate(createDefectSchema), async (req, res) => {
   const { 
     projectId, title, severity, description, status,
     externalId, owner, actionPlan, futImpact, blockedCases,

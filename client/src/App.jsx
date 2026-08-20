@@ -11,7 +11,6 @@ import {
   Upload, Download, Brain, Users, Bug, ArrowUpRight, TrendingDown, Settings, Plus, Terminal, Maximize2, Sparkles,
   ShoppingBag, Headphones, Smartphone, Home, Trash2, Monitor, MapPin, Layers, Lock, CreditCard, Shield, HelpCircle, Info
 } from 'lucide-react';
-import { io } from 'socket.io-client';
 import LoginScreen from './components/LoginScreen';
 import RegisterScreen from './components/RegisterScreen';
 import SubscriptionScreen from './components/SubscriptionScreen';
@@ -20,12 +19,11 @@ import HelpScreen from './components/HelpScreen';
 import AboutScreen from './components/AboutScreen';
 import { useTranslation } from './i18n';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import { useSocket } from './hooks/useSocket';
+import { useBurndown } from './hooks/useBurndown';
 
 const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
 const API_BASE = isLocal ? 'http://localhost:5000/api' : '/api';
-const socket = io(isLocal ? 'http://localhost:5000' : window.location.origin, {
-  transports: ['websocket', 'polling']
-});
 
 const MetricCard = ({ label, value, icon, change, trend, isDark }) => (
   <div className={`p-6 rounded-3xl border-2 transition-all hover:scale-105 duration-300 ${isDark ? 'bg-white/5 border-white/10 shadow-lg' : 'bg-white border-slate-400 shadow-xl'}`}>
@@ -97,6 +95,17 @@ const floatOrb = {
   },
 };
 
+const getContrastColor = (hexColor) => {
+  if (!hexColor) return '#000000';
+  const cleanHex = hexColor.replace('#', '');
+  if (cleanHex.length !== 6) return '#000000';
+  const r = parseInt(cleanHex.substring(0, 2), 16);
+  const g = parseInt(cleanHex.substring(2, 4), 16);
+  const b = parseInt(cleanHex.substring(4, 6), 16);
+  const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+  return (yiq >= 128) ? '#0f172a' : '#ffffff';
+};
+
 const App = () => {
   const { t } = useTranslation();
   const [projects, setProjects] = useState([]);
@@ -110,7 +119,7 @@ const App = () => {
   const [stats, setStats] = useState({ total: 0, passed: 0, failed: 0, blocked: 0, pending: 0 });
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [agentLogs, setAgentLogs] = useState([]);
+  const { socket, agentLogs, addLog, setAgentLogs } = useSocket();
   const [isEditScenarioModalOpen, setIsEditScenarioModalOpen] = useState(false);
   const [editingScenarioIndex, setEditingScenarioIndex] = useState(null);
   const [editingScenarioData, setEditingScenarioData] = useState(null);
@@ -118,8 +127,7 @@ const App = () => {
   const [unassignedCases, setUnassignedCases] = useState([]);
   const [testers, setTesters] = useState([]);
   const [selectedTesterId, setSelectedTesterId] = useState('');
-  const [burndownData, setBurndownData] = useState([]);
-  const [burndownMeta, setBurndownMeta] = useState(null);
+  const { burndownData, burndownMeta, fetchBurndown, setBurndownData, setBurndownMeta } = useBurndown(API_BASE, selectedProjectId);
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [newTester, setNewTester] = useState({ name: '', email: '' });
   const [editingTester, setEditingTester] = useState(null);
@@ -215,10 +223,6 @@ const App = () => {
 
     fetchTesters();
 
-    socket.on('agent:status', (data) => {
-      setAgentLogs(prev => [...prev.slice(-4), data.message]); // Keep last 5 logs
-    });
-
     const interceptor = axios.interceptors.response.use(
       (response) => response,
       (error) => {
@@ -236,7 +240,6 @@ const App = () => {
     );
 
     return () => {
-      socket.off('agent:status');
       axios.interceptors.response.eject(interceptor);
     };
   }, []);
@@ -982,23 +985,7 @@ const App = () => {
     }
   };
 
-  const fetchBurndown = async (projectIdOverride) => {
-    const id = projectIdOverride || selectedProjectId;
-    if (!id) return;
-    try {
-      const res = await axios.get(`${API_BASE}/test-cases/burndown?projectId=${id}`);
-      if (id !== selectedProjectIdRef.current) return;
-      if (res.data && res.data.data) {
-        setBurndownData(res.data.data);
-        setBurndownMeta(res.data.meta);
-      } else {
-        setBurndownData(res.data);
-        setBurndownMeta(null);
-      }
-    } catch (err) {
-      console.error('Burndown error', err);
-    }
-  };
+
 
   const handleProjectDateUpdate = async (field, value) => {
     if (!selectedProjectId) return;
@@ -1889,42 +1876,65 @@ const App = () => {
         {/* Project Tabs */}
         <div className="w-full overflow-x-auto no-scrollbar">
           <div className={`flex gap-2 p-1 ${isDark ? 'bg-black/20' : 'bg-slate-100'} backdrop-blur-sm rounded-2xl border-2 ${isDark ? 'border-white/10' : 'border-slate-400'} w-fit flex-nowrap whitespace-nowrap`}>
-            {projects.map(project => (
-              <div key={project.id} className="relative group flex items-center shrink-0">
-                <button
-                  onClick={() => setSelectedProjectId(project.id)}
-                  className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                    selectedProjectId === project.id 
-                    ? (isDark ? 'bg-primary text-white shadow-lg shadow-primary/40' : 'bg-white text-primary shadow-lg')
-                    : (isDark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:bg-white/40')
-                  }`}
-                >
-                  {project.name}
-                </button>
-                {selectedProjectId === project.id && (
+            {projects.map(project => {
+              const isSelected = selectedProjectId === project.id;
+              const contrastColor = getContrastColor(project.themeColor);
+              const buttonStyle = {
+                backgroundColor: isSelected 
+                  ? project.themeColor 
+                  : (isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.02)'),
+                color: isSelected 
+                  ? contrastColor 
+                  : (isDark ? '#94a3b8' : '#475569'),
+                borderColor: isSelected 
+                  ? project.themeColor 
+                  : (isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'),
+                borderWidth: '1px',
+                borderStyle: 'solid',
+              };
+              return (
+                <div key={project.id} className="relative group flex items-center shrink-0">
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      // Close = remove from UI list
-                      const remaining = projects.filter(p => p.id !== project.id);
-                      setProjects(remaining);
-                      setHiddenProjectIds(prev => [...prev, project.id]);
-                      
-                      // Switch selection to another project if one exists
-                      if (remaining.length > 0) {
-                        setSelectedProjectId(remaining[0].id);
-                      } else {
-                        setSelectedProjectId(null);
-                      }
-                    }}
-                    className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
-                    title="Close Project"
+                    onClick={() => setSelectedProjectId(project.id)}
+                    style={buttonStyle}
+                    className="px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center shadow-sm hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    ✕
+                    {project.logoUrl ? (
+                      <img 
+                        src={project.logoUrl} 
+                        alt="" 
+                        className="w-5 h-5 rounded-md object-cover mr-2 shrink-0 border border-black/10" 
+                      />
+                    ) : (
+                      <Layers size={16} className="mr-2 shrink-0 opacity-70" />
+                    )}
+                    <span>{project.name}</span>
                   </button>
-                )}
-              </div>
-            ))}
+                  {selectedProjectId === project.id && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Close = remove from UI list
+                        const remaining = projects.filter(p => p.id !== project.id);
+                        setProjects(remaining);
+                        setHiddenProjectIds(prev => [...prev, project.id]);
+                        
+                        // Switch selection to another project if one exists
+                        if (remaining.length > 0) {
+                          setSelectedProjectId(remaining[0].id);
+                        } else {
+                          setSelectedProjectId(null);
+                        }
+                      }}
+                      className={`absolute -top-1 -right-1 w-5 h-5 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:scale-110 z-10`}
+                      title="Close Project"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              );
+            })}
             <button
               onClick={() => {
                 if (!canMultipleProjects && projects.length >= 1) {

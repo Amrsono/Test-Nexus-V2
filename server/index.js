@@ -4,6 +4,8 @@ const dotenv = require('dotenv');
 const http = require('http');
 const socketManager = require('./socket');
 const prisma = require('./lib/prisma');
+const logger = require('./lib/logger');
+const errorHandler = require('./middleware/errorHandler');
 
 const path = require('path');
 dotenv.config(); // Default fallback
@@ -69,15 +71,20 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Catch-all 404 handler to return JSON instead of HTML
-app.use((req, res) => {
-  res.status(404).json({ error: `Express 404: Cannot ${req.method} ${req.url} (originalUrl: ${req.originalUrl})` });
+app.use((req, res, next) => {
+  const err = new Error(`Express 404: Cannot ${req.method} ${req.url}`);
+  err.status = 404;
+  next(err);
 });
+
+// Global Error Handler Middleware
+app.use(errorHandler);
 
 // Export app for Vercel
 module.exports = app;
 
 if (require.main === module) {
   server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT} with Agent Socket active`);
+    logger.info(`Server is running on port ${PORT} with Agent Socket active`);
   });
 }

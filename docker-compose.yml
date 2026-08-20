@@ -1,0 +1,40 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_PASSWORD: nexus_password
+      POSTGRES_DB: test_nexus
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://nexus:nexus_password@db:5432/test_nexus?schema=public
+      JWT_SECRET: change_me_in_production
+      PORT: 5000
+      NODE_ENV: production
+    ports:
+      - "5000:5000"
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - "3000:80"
+
+volumes:
+  pgdata:
