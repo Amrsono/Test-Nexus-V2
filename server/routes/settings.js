@@ -47,6 +47,14 @@ router.post('/', auth, isAdmin, async (req, res) => {
     );
     
     await Promise.all(operations);
+    
+    // Update process.env in memory immediately
+    settings.forEach(s => {
+      if (s.key && s.value) {
+        process.env[s.key] = s.value.trim();
+      }
+    });
+
     res.json({ message: 'Settings updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

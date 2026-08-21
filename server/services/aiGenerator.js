@@ -10,19 +10,23 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
  * Generates test scenarios based on requirements.
  */
 const generateScenarios = async (requirements, onProgress, options = {}) => {
-  const candidateModels = ['models/gemini-2.5-flash', 'models/gemini-2.0-flash', 'models/gemini-flash-latest', 'models/gemini-1.5-flash'];
+  const candidateModels = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   let lastError;
   const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   
-  // Fetch API key dynamically from settings
-  let apiKey = process.env.GEMINI_API_KEY;
+  // Fetch API key dynamically from settings (DB Admin Settings take precedence over env)
+  let apiKey = null;
   try {
     const setting = await prisma.systemSettings.findUnique({ where: { key: 'GEMINI_API_KEY' } });
-    if (setting && setting.value) {
-      apiKey = setting.value;
+    if (setting && setting.value && setting.value.trim()) {
+      apiKey = setting.value.trim();
     }
   } catch (err) {
     console.error('Error fetching GEMINI_API_KEY from settings:', err);
+  }
+
+  if (!apiKey && process.env.GEMINI_API_KEY) {
+    apiKey = process.env.GEMINI_API_KEY.trim();
   }
 
   if (!apiKey) {
