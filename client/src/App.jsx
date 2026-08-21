@@ -18,6 +18,7 @@ import SubscriptionScreen from './components/SubscriptionScreen';
 import AdminDashboard from './components/AdminDashboard';
 import HelpScreen from './components/HelpScreen';
 import AboutScreen from './components/AboutScreen';
+import SJProductLogo from './components/SJProductLogo';
 import { useTranslation } from './i18n';
 import LanguageSwitcher from './components/LanguageSwitcher';
 
@@ -3941,6 +3942,7 @@ const App = () => {
     </>
       )}
       <Analytics />
+      <SJProductLogo isDark={isDark} />
     </div>
   );
 };
