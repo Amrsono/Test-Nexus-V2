@@ -32,8 +32,12 @@ function AppContent() {
 
   // Auth State
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : null;
+    const saved = localStorage.getItem('user') || localStorage.getItem('nexus_user');
+    try {
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
   });
   const [authView, setAuthView] = useState('login'); // 'login' | 'register'
   const [currentView, setCurrentView] = useState('dashboard'); // 'dashboard' | 'lab' | 'subscription' | 'admin' | 'help' | 'about'
@@ -124,16 +128,33 @@ function AppContent() {
   }, [user, activeProjectId, fetchProjectData]);
 
   // Auth Handlers
-  const handleLogin = (userData, token) => {
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(userData));
+  const handleLogin = (data, optionalToken) => {
+    let userData = data;
+    let token = optionalToken;
+
+    if (data && typeof data === 'object') {
+      if (data.user) userData = data.user;
+      if (data.token) token = data.token;
+    }
+
+    if (token) {
+      localStorage.setItem('token', token);
+      localStorage.setItem('nexus_token', token);
+    }
+    if (userData) {
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('nexus_user', JSON.stringify(userData));
+    }
+
     setUser(userData);
-    toast.success(`Welcome back, ${userData.name || userData.email}!`);
+    toast.success(`Welcome back, ${userData?.name || userData?.email || 'User'}!`);
   };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('nexus_token');
+    localStorage.removeItem('nexus_user');
     setUser(null);
     toast.info('Logged out successfully.');
   };
