@@ -23,6 +23,7 @@ import SubscriptionScreen from './components/SubscriptionScreen';
 import AdminDashboard from './components/AdminDashboard';
 import HelpScreen from './components/HelpScreen';
 import AboutScreen from './components/AboutScreen';
+import SJProductLogo from './components/SJProductLogo';
 import { useTranslation } from './i18n';
 
 function AppContent() {
@@ -537,6 +538,7 @@ function AppContent() {
 
       <ToastNotification />
       <Analytics />
+      <SJProductLogo isDark={isDark} />
     </div>
   );
 }

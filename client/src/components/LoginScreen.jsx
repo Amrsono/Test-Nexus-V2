@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { Terminal, Shield, Lock, Mail, Sparkles, Activity } from 'lucide-react';
 import { useTranslation } from '../i18n';
+import SJProductLogo from './SJProductLogo';
 
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000/api' : '/api';
 
@@ -122,6 +123,7 @@ const LoginScreen = ({ onLogin, onSwitchToRegister }) => {
           </div>
         </div>
       </div>
+      <SJProductLogo isDark={true} />
     </div>
   );
 };
