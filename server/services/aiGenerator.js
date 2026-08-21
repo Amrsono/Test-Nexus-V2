@@ -149,6 +149,11 @@ const generateScenarios = async (requirements, onProgress, options = {}) => {
     }
   }
 
+  const isApiKeyInvalid = lastError?.message?.includes('API_KEY_INVALID') || lastError?.message?.includes('API key not valid');
+  if (isApiKeyInvalid) {
+    throw new Error('Your Gemini API Key is invalid or expired. Please enter a valid GEMINI_API_KEY in Vercel Environment Variables or in Admin Settings.');
+  }
+
   const isFinalQuotaError = lastError?.message?.includes('429') || lastError?.status === 429;
   if (isFinalQuotaError) {
     if (onProgress) onProgress('AI Agent: ❌ All models are currently rate-limited (429). Please wait 30-60 seconds.');
